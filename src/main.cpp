@@ -1,14 +1,10 @@
 #include <Arduino.h>
 
 #include "elapsedMillis.h"
-
-#include "WiFi.h"
-#include <esp_wifi.h>
-
 #include "HomeSpan.h" 
-
 #include <ESP32CAN.h>
 #include <CAN_config.h>
+
 #include "config.h"
 
 #define INDICATOR_PIN_R 2
@@ -18,9 +14,9 @@
 #define HOMESPAN_CONTROL_PIN 21
 #define HOMESPAN_CONTROL_GND 19
 
-constexpr uint16_t switchCount = sizeof(switchInfo) / sizeof(SwitchDeviceRec);
-constexpr uint16_t fanCount = sizeof(fanInfo) / sizeof(FanDeviceRec);
-constexpr uint16_t thermostatCount = sizeof(thermostatInfo) / sizeof(ThermostatDeviceRec);
+constexpr uint16_t maxSwitches = 20;
+constexpr uint16_t maxFans = 2;
+constexpr uint16_t maxThermostats = 2;
 
 CAN_device_t CAN_cfg;               // CAN Config
 unsigned long previousMillis = 0;   // will store last time a CAN Message was send
@@ -205,33 +201,29 @@ struct RVThermostat : Service::Thermostat {
 	}
 };
 
-constexpr uint16_t maxSwitches = 20;
-constexpr uint16_t maxFans = 2;
-constexpr uint16_t maxThermostats = 2;
-
 RVSwitch* switches[maxSwitches];
-uint16_t switchIndex = 0;
+uint16_t switchCount = 0;
 
 RVRoofFan* fans[maxFans];
-uint16_t fanIndex = 0;
+uint16_t fanCount = 0;
 
 RVThermostat* thermostats[maxThermostats];
-uint16_t thermostatIndex = 0;
+uint16_t thermostatCount = 0;
 
 void setSwitchState(uint8_t index, bool on) {
-	for (uint16_t i=0; i<switchIndex; i++) {
+	for (uint16_t i=0; i<switchCount; i++) {
 		switches[i]->setOnOff(index, on);
 	}
 }
 
 void setLampBrightness(uint8_t index, int8_t level) {
-	for (uint16_t i=0; i<switchIndex; i++) {
+	for (uint16_t i=0; i<switchCount; i++) {
 		switches[i]->setLevel(index, level);
 	}
 }
 
 void setFanActive(uint8_t index, bool on) {
-	for (uint16_t i=0; i<fanIndex; i++) {
+	for (uint16_t i=0; i<fanCount; i++) {
 		fans[i]->setActive(index, on);
 	}
 }
@@ -239,33 +231,24 @@ void setFanActive(uint8_t index, bool on) {
 void createDevices() {
 	SPAN_ACCESSORY();   // create Bridge
 
-	for (uint16_t i=0; i<switchCount; i++) {
-		SwitchDeviceRec* device = &switchInfo[i];
+		const char* typeNames[] = { "Lamp", "Dimmable", "Switch" };
+		for (SwitchDeviceRec device : switchList) {
+			printf("Creating %s #%d: \"%s\"\n", typeNames[device.type], device.index, device.name);
+			SPAN_ACCESSORY(device.name);
+				switches[switchCount++] = new RVSwitch(&device);
+		}
 
-		static const char* typeNames[] = { "Lamp", "Dimmable", "Switch" };
-		printf("Creating %s #%d: \"%s\"\n", typeNames[device->type], device->index, device->name);
+		for (FanDeviceRec fan : fanList) {
+			printf("Creating Fan #%d: \"%s\"\n", fan.index, fan.name);
+			SPAN_ACCESSORY(fan.name);
+				fans[fanCount++] = new RVRoofFan(&fan);
+		}
 
-		SPAN_ACCESSORY(device->name);
-			switches[switchIndex++] = new RVSwitch(device);
-	}
-
-	for (uint16_t i=0; i<fanCount; i++) {
-		FanDeviceRec* device = &fanInfo[i];
-
-		printf("Creating Fan #%d: \"%s\"\n", device->index, device->name);
-
-		SPAN_ACCESSORY(device->name);
-			fans[fanIndex++] = new RVRoofFan(device);
-	}
-
-	for (uint16_t i=0; i<thermostatCount; i++) {
-		ThermostatDeviceRec* device = &thermostatInfo[i];
-
-		printf("Creating Thermostat #%d: \"%s\"\n", device->index, device->name);
-
-		SPAN_ACCESSORY(device->name);
-			thermostats[thermostatIndex++] = new RVThermostat(device);
-	}
+		for (ThermostatDeviceRec thermostat : thermostatList) {
+			printf("Creating Thermostat #%d: \"%s\"\n", thermostat.index, thermostat.name);
+			SPAN_ACCESSORY(thermostat.name);
+				thermostats[thermostatCount++] = new RVThermostat(&thermostat);
+		}
 }
 
 void setup() {

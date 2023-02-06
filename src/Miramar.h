@@ -1,6 +1,6 @@
 #include "devices.h"
 
-SwitchDeviceRec switchInfo[] = {
+const SwitchDeviceRec switchList[] = {
     1, DimmableLamp, "Living Room",
     2, DimmableLamp, "Hall",
     4, DimmableLamp, "Bedroom",
@@ -15,12 +15,12 @@ SwitchDeviceRec switchInfo[] = {
     23, Switch, "Water Pump"
 };
 
-FanDeviceRec fanInfo[] = {
+const FanDeviceRec fanList[] = {
     20, 51, 52, "Kitchen",
     21, 47, 48, "Bathroom"
 };
 
-ThermostatDeviceRec thermostatInfo[] = {
+const ThermostatDeviceRec thermostatList[] = {
     1, 1, true, "Front",
     2, 2, false, "Back"
 };

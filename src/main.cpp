@@ -165,7 +165,6 @@ struct RVThermostat : Service::Thermostat {
 		_targetTemp->setRange(10,30,0.5)->setVal(20);
 		_curState = new Characteristic::CurrentHeatingCoolingState(0);
 		_targetState = new Characteristic::TargetHeatingCoolingState(0);
-
 		new Characteristic::TemperatureDisplayUnits(1);
 
 		if (device->hasHeating) {

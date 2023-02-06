@@ -1,5 +1,6 @@
 #include "devices.h"
 
+// index, type, name
 const SwitchDeviceRec switchList[] = {
     1, DimmableLamp, "Living Room",
     2, DimmableLamp, "Hall",
@@ -15,11 +16,13 @@ const SwitchDeviceRec switchList[] = {
     23, Switch, "Water Pump"
 };
 
+// index, upIndex, downIndex, name
 const FanDeviceRec fanList[] = {
     20, 51, 52, "Kitchen",
     21, 47, 48, "Bathroom"
 };
 
+// index, fanIndex, name
 const ThermostatDeviceRec thermostatList[] = {
     1, 1, true, "Front",
     2, 2, false, "Back"

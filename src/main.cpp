@@ -422,7 +422,7 @@ void loop() {
 	unsigned long currentMillis = millis();
 
 	// Receive next CAN frame from queue
-	if (xQueueReceive(CAN_cfg.rx_queue, &rx_frame, 3 * portTICK_PERIOD_MS) == pdTRUE) {
+	if (xQueueReceive(CAN_cfg.rx_queue, &rx_frame, 0 /*3 * portTICK_PERIOD_MS */) == pdTRUE) {
 		analyzeFrame(&rx_frame);
 	}
 

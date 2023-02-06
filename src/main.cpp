@@ -7,6 +7,8 @@
 
 #include "config.h"
 
+//////////////////////////////////////////////
+
 #define INDICATOR_PIN_R 2
 #define INDICATOR_PIN_G 15
 #define INDICATOR_PIN_B 4
@@ -22,6 +24,17 @@ CAN_device_t CAN_cfg;               // CAN Config
 unsigned long previousMillis = 0;   // will store last time a CAN Message was send
 const int interval = 1000;          // interval at which send CAN Messages (milliseconds)
 const int rx_queue_size = 10;       // Receive Queue size
+
+RVSwitch* switches[maxSwitches];
+uint16_t switchCount = 0;
+
+RVRoofFan* fans[maxFans];
+uint16_t fanCount = 0;
+
+RVThermostat* thermostats[maxThermostats];
+uint16_t thermostatCount = 0;
+
+//////////////////////////////////////////////
 
 void sendOnOff(uint8_t index, bool on) {
 	printf("sendOnOff: #%d to %d\n", index, on);
@@ -200,14 +213,7 @@ struct RVThermostat : Service::Thermostat {
 	}
 };
 
-RVSwitch* switches[maxSwitches];
-uint16_t switchCount = 0;
-
-RVRoofFan* fans[maxFans];
-uint16_t fanCount = 0;
-
-RVThermostat* thermostats[maxThermostats];
-uint16_t thermostatCount = 0;
+//////////////////////////////////////////////
 
 void setSwitchState(uint8_t index, bool on) {
 	for (uint16_t i=0; i<switchCount; i++) {
@@ -226,6 +232,8 @@ void setFanActive(uint8_t index, bool on) {
 		fans[i]->setActive(index, on);
 	}
 }
+
+//////////////////////////////////////////////
 
 void createDevices() {
 	SPAN_ACCESSORY();   // create Bridge
@@ -249,6 +257,8 @@ void createDevices() {
 				thermostats[thermostatCount++] = new RVThermostat(&thermostat);
 		}
 }
+
+//////////////////////////////////////////////
 
 void setup() {
 	pinMode(INDICATOR_PIN_R, OUTPUT);
@@ -296,6 +306,8 @@ void setup() {
 	Serial.println("Init complete.");
 }
 
+//////////////////////////////////////////////
+
 uint32_t getBits(uint32_t val, int8_t startBit, int8_t numBits) {
 	int8_t shift = startBit - numBits + 1;
 	uint32_t mask = 0xFFFFFFFF >> (32 - numBits);
@@ -310,6 +322,8 @@ uint32_t makeMsg(uint32_t dgn, uint8_t sourceID=0, uint8_t priority=6) {
 
 	return (priority<<26) | (dgn << 8) | sourceID;	
 }
+
+//////////////////////////////////////////////
 
 void analyzeFrame(CAN_frame_t *frame, bool force=false) {
 	if (frame->FIR.B.RTR == CAN_RTR) {
@@ -409,6 +423,8 @@ void analyzeFrame(CAN_frame_t *frame, bool force=false) {
 		}
 	}
 }
+
+//////////////////////////////////////////////
 
 void loop() {
 	static elapsedMillis blinkTime;

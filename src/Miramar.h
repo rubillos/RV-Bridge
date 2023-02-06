@@ -19,3 +19,8 @@ FanDeviceRec fanInfo[] = {
     20, 51, 52, "Kitchen",
     21, 47, 48, "Bathroom"
 };
+
+ThermostatDeviceRec thermostatInfo[] = {
+    1, 1, true, "Front",
+    2, 2, false, "Back"
+};

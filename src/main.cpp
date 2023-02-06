@@ -1,14 +1,14 @@
 #include <Arduino.h>
 
-// #include "HomeSpan.h" 
-
 #include "elapsedMillis.h"
+
+#include "WiFi.h"
+#include <esp_wifi.h>
 
 #include "HomeSpan.h" 
 
 #include <ESP32CAN.h>
 #include <CAN_config.h>
-
 #include "config.h"
 
 #define INDICATOR_PIN_R 2
@@ -18,8 +18,9 @@
 #define HOMESPAN_CONTROL_PIN 21
 #define HOMESPAN_CONTROL_GND 19
 
-constexpr uint8_t switchCount = sizeof(switchInfo) / sizeof(SwitchDeviceRec);
-constexpr uint8_t fanCount = sizeof(fanInfo) / sizeof(FanDeviceRec);
+constexpr uint16_t switchCount = sizeof(switchInfo) / sizeof(SwitchDeviceRec);
+constexpr uint16_t fanCount = sizeof(fanInfo) / sizeof(FanDeviceRec);
+constexpr uint16_t thermostatCount = sizeof(thermostatInfo) / sizeof(ThermostatDeviceRec);
 
 CAN_device_t CAN_cfg;               // CAN Config
 unsigned long previousMillis = 0;   // will store last time a CAN Message was send
@@ -34,23 +35,34 @@ void sendLampLevel(uint8_t index, uint8_t level) {
 	printf("sendLampLevel: #%d to %d\n", index, level);
 }
 
-struct RVSwitch : Service::LightBulb {
-	SpanCharacteristic *_on;
-	SpanCharacteristic *_level;
+const char* switchTypes[3] = { "43", "43", "49" };
+const char* switchHapNames[3] = { "LightBulb", "LightBulb", "Switch" };
+
+struct RVSwitch : SpanService {
+	SpanCharacteristic *_on = NULL;
+	SpanCharacteristic *_brightness = NULL;
 	uint8_t _index;
 	SwitchType _type;
 
-	RVSwitch(uint8_t index, SwitchType type) : Service::LightBulb() {
-		_index = index;
-		_type = type;
+	RVSwitch(SwitchDeviceRec *device) : SpanService( switchTypes[device->type], switchHapNames[device->type] ) {
+		_index = device->index;
+		_type = device->type;
+
+		REQ(On);
+		OPT(Name);
+
+		if (_type == Lamp || _type == DimmableLamp) {
+			OPT(Brightness);
+			OPT(Hue);
+			OPT(Saturation);
+			OPT(ColorTemperature);
+		}
+
 		_on = new Characteristic::On();
 
-		if (type == DimmableLamp) {
-			_level = new Characteristic::Brightness(100);
-			_level->setRange(0, 100, 1);
-		}
-		if (type == Switch) {
-			setType("49", "Switch");
+		if (_type == DimmableLamp) {
+			_brightness = new Characteristic::Brightness(100);
+			_brightness->setRange(0, 100, 1);
 		}
 	}
 	
@@ -59,8 +71,8 @@ struct RVSwitch : Service::LightBulb {
 			sendOnOff(_index, _on->getNewVal());
 		}
 
-		if (_level && _level->updated()) {
-			sendLampLevel(_index, _level->getNewVal());
+		if (_brightness && _brightness->updated()) {
+			sendLampLevel(_index, _brightness->getNewVal());
 		}
 
 		return(true);  
@@ -68,32 +80,37 @@ struct RVSwitch : Service::LightBulb {
 	
 	void setOnOff(uint8_t index, bool on) {
 		if (index == _index) {
-			printf("setOnOff: #%d = %d\n", index, on);
+			printf("Switch #%d: setOnOff = %d\n", index, on);
 			_on->setVal(on);
 		}
 	}
 	void setLevel(uint8_t index, uint8_t level) {
 		if (index == _index) {
-			printf("setLevel: #%d = %d\n", index, level);
-			_level->setVal(level);
+			printf("Switch #%d: setOnOff = %d\n", index, level);
+			_brightness->setVal(level);
 		}
 	}
-
 };
 
-struct RVFan : Service::Fan {
+struct RVRoofFan : Service::Fan {
 	SpanCharacteristic *_active;
 	uint8_t _index;
+	uint8_t _upIndex;
+	uint8_t _downIndex;
 
-	RVFan(uint8_t index) : Service::Fan() {
-		_index = index;
+	RVRoofFan(FanDeviceRec *device) : Service::Fan() {
+		_index = device->index;
+		_upIndex = device->upIndex;
+		_downIndex = device->downIndex;
 		_active = new Characteristic::Active();
-
 	}
 	
 	boolean update() {
 		if (_active->updated()) {
-			sendOnOff(_index, _active->getNewVal());
+			bool newValue = _active->getNewVal();
+			sendOnOff(_index, newValue);
+			sendOnOff(_upIndex, (newValue) ? 1 : 0);
+			sendOnOff(_downIndex, (newValue) ? 0 : 1);
 		}
 
 		return(true);  
@@ -101,20 +118,105 @@ struct RVFan : Service::Fan {
 	
 	void setActive(uint8_t index, bool on) {
 		if (index == _index) {
-			printf("setOnOff: #%d = %d\n", index, on);
+			printf("Fan #%d: setActive = %d\n", index, on);
 			_active->setVal(on);
 		}
 	}
 };
 
-constexpr uint8_t maxSwitches = 20;
-constexpr uint8_t maxFans = 2;
+struct RVHVACFan : Service::Fan {
+	SpanCharacteristic *_active;
+	SpanCharacteristic *_speed;
+
+	uint8_t _index;
+
+	RVHVACFan(uint8_t index) : Service::Fan() {
+		_active = new Characteristic::Active();
+		_speed = new Characteristic::RotationSpeed();
+		_speed->setRange(0, 2, 1);
+
+		_index = index;
+	}
+	
+	boolean update() {
+		if (_active->updated()) {
+			printf("RVHVACFan #%d - Active: %d\n", _index, _active->getNewVal());
+		}
+
+		if (_speed->updated()) {
+			printf("RVHVACFan #%d - Rotation: %d\n", _index, _active->getNewVal());
+		}
+
+		return(true);  
+	}
+};
+
+struct RVThermostat : Service::Thermostat {
+	SpanCharacteristic *_ambientTemp;
+	SpanCharacteristic *_targetTemp;
+	SpanCharacteristic *_curState;
+	SpanCharacteristic *_targetState;
+
+	SpanService *_fan;
+
+	uint8_t _index;
+
+	bool _updateState = false;
+
+	RVThermostat(ThermostatDeviceRec *device) : Service::Thermostat() {
+		_ambientTemp = new Characteristic::CurrentTemperature(22);
+		_targetTemp = new Characteristic::TargetTemperature(22);
+		_targetTemp->setRange(10,30,0.5)->setVal(20);
+		_curState = new Characteristic::CurrentHeatingCoolingState(0);
+		_targetState = new Characteristic::TargetHeatingCoolingState(0);
+
+		new Characteristic::TemperatureDisplayUnits(1);
+
+		if (device->hasHeating) {
+			_targetState->setValidValues(3, 0, 1, 2);
+		}
+		else {
+			_targetState->setValidValues(2, 0, 2);
+		}
+
+		_index = device->index;
+
+		_fan = new RVHVACFan(device->fanIndex);
+	}
+
+	boolean update() {
+		if (_targetState->updated()) {
+			printf("RVThermostat #%d, Target State: %d\n", _index, _targetState->getNewVal());
+			_updateState = true;
+		}
+		if (_targetTemp->updated()) {
+			printf("RVThermostat #%d - Target Temp: %f\n", _index, _targetTemp->getNewVal<double>());
+		}
+
+		return(true);  
+	}
+
+	void loop() {
+		if (_updateState) {
+			printf("Updating Current State\n");
+			_curState->setVal(_targetState->getVal());
+			_updateState = false;
+		}
+	}
+};
+
+constexpr uint16_t maxSwitches = 20;
+constexpr uint16_t maxFans = 2;
+constexpr uint16_t maxThermostats = 2;
 
 RVSwitch* switches[maxSwitches];
-uint8_t switchIndex = 0;
+uint16_t switchIndex = 0;
 
-RVFan* fans[maxFans];
-uint8_t fanIndex = 0;
+RVRoofFan* fans[maxFans];
+uint16_t fanIndex = 0;
+
+RVThermostat* thermostats[maxThermostats];
+uint16_t thermostatIndex = 0;
 
 void setSwitchState(uint8_t index, bool on) {
 	for (uint16_t i=0; i<switchIndex; i++) {
@@ -131,6 +233,38 @@ void setLampBrightness(uint8_t index, int8_t level) {
 void setFanActive(uint8_t index, bool on) {
 	for (uint16_t i=0; i<fanIndex; i++) {
 		fans[i]->setActive(index, on);
+	}
+}
+
+void createDevices() {
+	SPAN_ACCESSORY();   // create Bridge
+
+	for (uint16_t i=0; i<switchCount; i++) {
+		SwitchDeviceRec* device = &switchInfo[i];
+
+		static const char* typeNames[] = { "Lamp", "Dimmable", "Switch" };
+		printf("Creating %s #%d: \"%s\"\n", typeNames[device->type], device->index, device->name);
+
+		SPAN_ACCESSORY(device->name);
+			switches[switchIndex++] = new RVSwitch(device);
+	}
+
+	for (uint16_t i=0; i<fanCount; i++) {
+		FanDeviceRec* device = &fanInfo[i];
+
+		printf("Creating Fan #%d: \"%s\"\n", device->index, device->name);
+
+		SPAN_ACCESSORY(device->name);
+			fans[fanIndex++] = new RVRoofFan(device);
+	}
+
+	for (uint16_t i=0; i<thermostatCount; i++) {
+		ThermostatDeviceRec* device = &thermostatInfo[i];
+
+		printf("Creating Thermostat #%d: \"%s\"\n", device->index, device->name);
+
+		SPAN_ACCESSORY(device->name);
+			thermostats[thermostatIndex++] = new RVThermostat(device);
 	}
 }
 
@@ -154,7 +288,7 @@ void setup() {
 	}
 
 	Serial.begin(115200);
-	Serial.println("RVC to HomeKit Bridge");
+	Serial.println("RV Bridge - Startup");
 
 	Serial.println("Init CAN module");
 	CAN_cfg.speed = CAN_SPEED_250KBPS;
@@ -163,23 +297,19 @@ void setup() {
 	CAN_cfg.rx_queue = xQueueCreate(rx_queue_size, sizeof(CAN_frame_t));
 	ESP32Can.CANInit();
 
+	#ifdef OVERRIDE_MAC_ADDRESS
+		uint8_t newMACAddress[] = OVERRIDE_MAC_ADDRESS;
+		esp_base_mac_addr_set(&newMACAddress[0]);
+		printf("MAC address updated to: %s\n", WiFi.macAddress().c_str());
+	#endif
+
 	Serial.println("Init HomeSpan");
-	homeSpan.setStatusPin(INDICATOR_PIN_B + 100);
+	homeSpan.setStatusPin(INDICATOR_PIN_B);
 	homeSpan.setControlPin(HOMESPAN_CONTROL_PIN);
 	homeSpan.setWifiCredentials(ssid, sspwd);
-	homeSpan.begin(Category::Bridges, "RV-Bridge Server", DEFAULT_HOST_NAME, "RV-Bridge-ESP32");
-
-	SPAN_ACCESSORY();   // create Bridge
-
-	for (uint16_t i=0; i<switchCount; i++) {
-		SwitchDeviceRec* device = &switchInfo[i];
-
-		static const char* typeNames[] = { "Lamp", "Dimmable", "Switch" };
-		printf("Creating %s: #%d \"%s\"\n", typeNames[device->type], device->index, device->name);
-
-		SPAN_ACCESSORY(device->name);
-			switches[switchIndex++] = new RVSwitch(device->index, device->type);
-	}
+	homeSpan.setSketchVersion(versionString);
+	homeSpan.begin(Category::Bridges, "RV-Bridge", DEFAULT_HOST_NAME, "RV-Bridge-ESP32");
+	createDevices();
 
 	Serial.println("Init complete.");
 }

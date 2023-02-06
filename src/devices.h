@@ -16,14 +16,17 @@ typedef struct {
 } SwitchDeviceRec;
 
 typedef struct {
-    uint8_t pwrIndex;
+    uint8_t index;
     uint8_t upIndex;
     uint8_t downIndex;
     const char* name;
 } FanDeviceRec;
 
 typedef struct {
-
+    uint8_t index;
+    uint8_t fanIndex;
+    bool hasHeating;
+    const char* name;
 } ThermostatDeviceRec;
 
 #endif

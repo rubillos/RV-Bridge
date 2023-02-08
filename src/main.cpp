@@ -188,7 +188,7 @@ struct RVHVACFan : Service::Fan {
 	RVHVACFan(uint8_t index) : Service::Fan() {
 		_active = new Characteristic::Active();
 		_speed = new Characteristic::RotationSpeed();
-		_speed->setRange(0, 2, 1);
+		_speed->setRange(0, 100, 50);
 
 		_index = index;
 	}
@@ -237,7 +237,7 @@ struct RVThermostat : Service::Thermostat {
 		_targetState = new Characteristic::TargetHeatingCoolingState(0);
 		new Characteristic::TemperatureDisplayUnits(1);
 
-		if (device->furnaceIndex) {
+		if (device->furnaceIndex != -1) {
 			_targetState->setValidValues(3, 0, 1, 2);
 		}
 		else {
@@ -293,7 +293,7 @@ struct RVThermostat : Service::Thermostat {
 
 	void setAmbientTemp(uint8_t index, double tempC) {
 		if (index == _index && fabs(tempC - _ambientTemp->getVal<double>()) > 0.2) {
-			printf("Set ambient temp #%d: %dºC\n", _index, tempC);
+			printf("Set ambient temp #%d: %fºC\n", _index, tempC);
 			_ambientTemp->setVal(tempC);
 		}
 	}
@@ -381,6 +381,86 @@ void createDevices() {
 
 //////////////////////////////////////////////
 
+const char* getValuePair(const char* buff, int8_t* val1, int8_t* val2) {
+	const char* equals = strchr(buff, '=');
+
+	*val1 = -1;
+	*val2 = -2;
+
+	if (equals) {
+		const char* buff2 = equals+1;
+		*val1 = atoi(buff);
+		*val2 = atoi(buff2);
+
+		buff = strchr(buff2, ',');
+		if (buff) {
+			buff += 1;
+		}
+		else {
+			buff = NULL;
+		}
+	}
+	else {
+		buff = NULL;
+	}
+
+	return buff;
+}
+
+void cmsSetState(const char *buff) {
+	buff += 1;
+	
+	while (buff) {
+		int8_t index = 0;
+		int8_t val = 0;
+
+		buff = getValuePair(buff, &index, &val);
+
+		if (index!=-1 && val!=-1) {
+			printf("cmdSetState: index=%d, val=%d\n", index, val);
+			setSwitchState(index, val);
+		}
+	}
+}
+
+void cmsSetBrightness(const char *buff) {
+	buff += 1;
+	
+	while (buff) {
+		int8_t index;
+		int8_t val;
+		buff = getValuePair(buff, &index, &val);
+
+		if (index!=-1 && val!=-1) {
+			printf("cmsSetBrightness: index=%d, val=%d\n", index, val);
+			setLampBrightness(index, val);
+		}
+	}
+}
+
+void cmsSetTemp(const char *buff) {
+	buff += 1;
+	
+	while (buff) {
+		int8_t index;
+		int8_t val;
+		buff = getValuePair(buff, &index, &val);
+
+		if (index!=-1 && val!=-1) {
+			double tempC = (val - 32.0) / 1.8;
+			printf("cmsSetTemp: index=%d, val=%dºF (%fºC)\n", index, val, tempC);
+			setAmbientTemp(index, tempC);
+		}
+	}
+}
+
+void addCommands() {
+	new SpanUserCommand('t',"<index>=<temperature>,... - set temperature of <index> to <val>", cmsSetTemp);
+	new SpanUserCommand('b',"<index>=<brightness>,... - set brightness of <index> to <val>", cmsSetBrightness);
+	new SpanUserCommand('s',"<index>=<val>,... - set state of <index> to <val>", cmsSetState);
+}
+
+//////////////////////////////////////////////
 typedef struct {
 	uint8_t pinNumber;
 	uint8_t mode;
@@ -417,19 +497,15 @@ void setup() {
 	CAN_cfg.rx_queue = xQueueCreate(rx_queue_size, sizeof(CAN_frame_t));
 	ESP32Can.CANInit();
 
-	#ifdef OVERRIDE_MAC_ADDRESS
-		uint8_t newMACAddress[] = OVERRIDE_MAC_ADDRESS;
-		esp_base_mac_addr_set(&newMACAddress[0]);
-		printf("MAC address updated to: %s\n", WiFi.macAddress().c_str());
-	#endif
-
 	Serial.println("Init HomeSpan");
 	homeSpan.setStatusPin(INDICATOR_PIN_B);
 	homeSpan.setControlPin(HOMESPAN_CONTROL_PIN);
 	homeSpan.setWifiCredentials(ssid, sspwd);
 	homeSpan.setSketchVersion(versionString);
 	homeSpan.begin(Category::Bridges, "RV-Bridge", DEFAULT_HOST_NAME, "RV-Bridge-ESP32");
+
 	createDevices();
+	addCommands();
 
 	Serial.println("Init complete.");
 }
@@ -598,7 +674,7 @@ void processFrame(CAN_frame_t *frame, bool force=true) {
 void loop() {
 	static elapsedMillis blinkTime;
 
-	digitalWrite(INDICATOR_PIN_R, (blinkTime % 2000) > 50);
+	digitalWrite(INDICATOR_PIN_R, (blinkTime % 2000) > 20);
 
 	homeSpan.poll();
 

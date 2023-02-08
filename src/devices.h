@@ -24,8 +24,8 @@ typedef struct {
 
 typedef struct {
     uint8_t index;
-    uint8_t fanIndex;
-    bool hasHeating;
+    uint8_t compressorIndex;
+    uint8_t furnaceIndex;
     const char* name;
 } ThermostatDeviceRec;
 

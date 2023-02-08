@@ -1,0 +1,3488 @@
+#
+# Copyright (C) 2019 Wandertech LLC
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+---
+
+# This file is versioned. Any changes here, even as small as changing
+# a name from lower case to upper case, can have an impact on tools
+# that have been written to use the mqtt output generated from this
+# spec file.
+API_VERSION: 1
+
+17F00:
+  name: GENERAL_RESET
+  parameters:
+    - byte: 0
+      bit: 0-1
+      name: reboot
+      type: bit
+      values:
+        00: no action
+        01: Reboot
+    - byte: 0
+      bit: 2-3
+      name: clear faults
+      type: bit
+      values:
+        00: no action
+        01: clear faults
+    - byte: 0
+      bit: 4-5
+      name: reset to default settings
+      type: bit
+      values:
+        00: no action
+        01: reset to default settings
+    - byte: 0
+      bit: 6-7
+      name: reset statistics
+      type: bit
+      values:
+        00: no action
+        01: reset statistics
+
+17E00:
+  name: TERMINAL
+  parameters:
+    - byte: 0-7
+      type: ascii
+
+1FED8:
+  name: GENERIC_CONFIGURATION_STATUS
+  parameters:
+    - byte: 0
+      name: manufacturer code (LSB)
+    - byte: 1
+      bit: 0-2
+      name: manufacturer code (MS bits)
+    - byte: 1
+      bit: 3-7
+      name: function instance
+    - byte: 2
+      name: function
+    - byte: 3
+      name: firmware revision
+    - byte: 4
+      name: configuration type (LSB)
+    - byte: 5
+      name: configuration type
+    - byte: 6
+      name: configuration type (MSB)
+    - byte: 7
+      name: configuration revision
+
+1FFFF:
+  name: DATE_TIME_STATUS
+  parameters:
+    - byte: 0
+      name: year
+      type: uint8
+      unit: year
+    - byte: 1
+      name: month
+      type: uint8
+    - byte: 2
+      name: date
+      type: uint8
+    - byte: 3
+      name: day of week
+      type: uint8
+      values:
+        1: Sunday
+        2: Monday
+        3: Tuesday
+        4: Wednesday
+        5: Thursday
+        6: Friday
+        7: Saturday
+    - byte: 4
+      name: hour
+      type: uint8
+    - byte: 5
+      name: minute
+      type: uint8
+    - byte: 6
+      name: second
+      type: uint8
+    - byte: 7
+      name: time zone
+      type: uint8
+      values:
+        0: Greenwich Mean Time
+        4: Eastern Daylight Time
+        5: Eastern Standard Time
+        7: Pacific Daylight Time
+        8: Pacific Standard Time
+        22: Central European Summer Time
+
+1FFFE:
+  name: SET_DATE_TIME_COMMAND
+  alias: 1FFFF
+
+1FFFD:
+  name: DC_SOURCE_STATUS_1
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+      values:
+        0: invalid
+        1: main house battery bank
+        2: chassis start battery
+        3: secondary house battery bank
+    - byte: 1
+      name: device priority
+      type: uint8
+      values:
+        120: battery soc device
+        100: inverter charger
+        80: charger
+        60: inverter
+        40: voltmeter ammeter
+        20: voltmeter
+    - byte: 2-3
+      name: dc voltage
+      type: uint16
+      unit: V
+    - byte: 4-7
+      name: dc current
+      type: uint32
+      unit: A
+
+1FFFC:
+  name: DC_SOURCE_STATUS_2
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+      values:
+        0: invalid
+        1: main house battery bank
+        2: chassis start battery
+        3: secondary house battery bank
+    - byte: 1
+      name: device priority
+      type: uint8
+      values:
+        120: battery soc device
+        100: inverter Charger
+        80: charger
+        60: inverter
+        40: voltmeter ammeter
+        20: voltmeter
+    - byte: 2-3
+      name: source temperature
+      type: uint16
+      unit: Deg C
+    - byte: 4
+      name: state of charge
+      type: uint8
+      unit: pct
+    - byte: 5-6
+      name: time remaining
+      type: uint16
+      unit: min
+
+1FFFB:
+  name: DC_SOURCE_STATUS_3
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+      values:
+        0: invalid
+        1: main house battery bank
+        2: chassis start battery
+        3: secondary house battery bank
+    - byte: 1
+      name: device priority
+      type: uint8
+      values:
+        120: battery soc device
+        100: inverter charger
+        80: charger
+        60: inverter
+        40: voltmeter ammeter
+        20: voltmeter
+    - byte: 2
+      name: state of health
+      type: uint8
+      unit: pct
+    - byte: 3-4
+      name: capacity remaining
+      type: uint16
+      unit: Ah
+    - byte: 5
+      name: relative capacity
+      type: uint8
+      unit: pct
+    - byte: 6-7
+      name: ac rms ripple
+      type: uint16
+      unit: mV
+
+1FEC9:
+  name: DC_SOURCE_STATUS_4
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+      values:
+        0: invalid
+        1: main house battery bank
+        2: chassis start battery
+        3: secondary house battery bank
+    - byte: 1
+      name: device priority
+      type: uint8
+      values:
+        120: battery soc device
+        100: inverter charger
+        80: charger
+        60: inverter
+        40: voltmeter ammeter
+        20: voltmeter
+    - byte: 2
+      name: desired charge state
+      type: uint8
+      values:
+        0: undefined
+        1: do not charge
+        2: bulk
+        3: absorbtion
+        4: overcharge
+        5: equalize
+        6: float
+        7: constant voltage current
+    - byte: 3-4
+      name: desired dc voltage
+      type: uint16
+      unit: V
+    - byte: 5-6
+      name: desired dc current
+      type: uint16
+      unit: A
+    - byte: 7
+      bit: 0-3
+      name: battery type
+      type: uint4
+      values:
+        0: flooded
+        1: gel
+        2: agm
+        3: lithium iron phosphate
+
+1FEC8:
+  name: DC_SOURCE_STATUS_5
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+      values:
+        0: invalid
+        1: main house battery bank
+        2: chassis start battery
+        3: secondary house battery bank
+    - byte: 1
+      name: device priority
+      type: uint8
+      values:
+        120: battery soc device
+        100: inverter charger
+        80: charger
+        60: inverter
+        40: voltmeter ammeter
+        20: voltmeter
+    - byte: 2-5
+      name: hp dc voltage
+      type: uint32
+      unit: V
+    - byte: 6-7
+      name: dc voltage rate of change
+      type: uint16
+      unit: mV/s
+
+1FEC7:
+  name: DC_SOURCE_STATUS_6
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+      values:
+        0: invalid
+        1: main house battery bank
+        2: chassis start battery
+        3: secondary house battery bank
+    - byte: 1
+      name: device priority
+      type: uint8
+      values:
+        120: battery soc device
+        100: inverter charger
+        80: charger
+        60: inverter
+        40: voltmeter ammeter
+        20: voltmeter
+    - byte: 2
+      bit: 0-1
+      name: high voltage limit status
+      type: bit
+      values:
+        00: not reached
+        01: limit reached
+    - byte: 2
+      bit: 2-3
+      name: high voltage disconnect status
+      type: bit
+      values:
+        00: connected
+        01: charge bus disconnected
+    - byte: 2
+      bit: 4-5
+      name: low voltage limit status
+      type: bit
+      values:
+        00: not reached
+        01: limit reached
+    - byte: 2
+      bit: 6-7
+      name: low voltage disconnect status
+      type: bit
+      values:
+        00: connected
+        01: charge bus disconnected
+
+10FFD:
+  name: DC_SOURCE_STATUS_SPYDER
+  alias: 1FFFD
+  comment: Spyder sometimes uses this off-spec DGN to report house battery voltage in case the Magnum inverter uses the primary DGN.
+
+1FFFA:
+  name: COMMUNICATION_STATUS_1
+  parameters:
+    - byte: 0-3
+      name: timer count
+      type: uint32
+      unit: ms
+    - byte: 4-5
+      name: receive error count
+      type: uint16
+    - byte: 6-7
+      name: transmit error count
+      type: uint16
+
+1FFF9:
+  name: COMMUNICATION_STATUS_2
+  parameters:
+    - byte: 0-3
+      name: transmitted frames count
+      type: uint32
+    - byte: 4-7
+      name: received frames count
+      type: uint32
+
+1FFF8:
+  name: COMMUNICATION_STATUS_3
+  parameters:
+    - byte: 0-1
+      name: bus-off error count
+      type: uint16
+    - byte: 2-3
+      name: receive frames dropped count
+      type: uint16
+    - byte: 4-5
+      name: transmit frames dropped count
+      type: uint16
+
+1FFF7:
+  name: WATERHEATER_STATUS
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+    - byte: 1
+      name: operating modes
+      type: uint8
+      values:
+        0: off
+        1: combustion
+        2: electric
+        3: gas electric
+        4: automatic
+        5: test combustion
+        6: test electric
+    - byte: 2-3
+      name: set point temperature
+      type: uint16
+      unit: Deg C
+    - byte: 4-5
+      name: water temperature
+      type: uint16
+      unit: Deg C
+    - byte: 6
+      bit: 0-1
+      name: thermostat status
+      type: bit
+      values:
+        00: set point met
+        01: set point not met
+    - byte: 6
+      bit: 2-3
+      name: burner status
+      type: bit
+      values:
+        00: off
+        01: ac element is active
+    - byte: 6
+      bit: 4-5
+      name: ac element status
+      type: bit
+      values:
+        00: no fault
+        01: open neutral fault detected
+    - byte: 6
+      bit: 6-7
+      name: high temperature limit switch status
+      type: bit
+      values:
+        00: limit switch not tripped
+        01: limit switch tripped
+    - byte: 7
+      bit: 0-1
+      name: failure to ignite status
+      type: bit
+      values:
+        00: no failure
+        01: failed to ignite
+    - byte: 7
+      bit: 2-3
+      name: ac power failure status
+      type: bit
+      values:
+        00: ac power present
+        01: ac power not present
+    - byte: 7
+      bit: 4-5
+      name: dc power failure status
+      type: bit
+      values:
+        00: dc power present
+        01: dc power not present
+
+1FFF6:
+  name: WATERHEATER_COMMAND
+  alias: 1FFF7
+
+1FFF5:
+  name: GAS_SENSOR_STATUS
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+    - byte: 1
+      name: type
+      type: uint8
+      values:
+        1: co
+        2: lp gas
+        3: smoke
+    - byte: 2-3
+      name: ppm
+      type: uint16
+      unit: ppm
+    - byte: 4
+      bit: 0-1
+      name: alarm
+      unit: bit
+      values:
+        00: no alarm
+        01: alarm
+    - byte: 4
+      bit: 2-3
+      name: warning
+      unit: bit
+      values:
+        00: no warning
+        01: warning
+    - byte: 4
+      bit: 4-5
+      name: dc supply failure
+      unit: bit
+      values:
+        00: no failure
+        01: failure
+    - byte: 4
+      bit: 6-7
+      name: sensor failure
+      unit: bit
+      values:
+        00: no failure
+        01: failure
+
+1FFF4:
+  name: CHASSIS_MOBILITY_STATUS
+  parameters:
+    - byte: 0-1
+      name: engine rpms
+      type: uint16
+      unit: rpm
+    - byte: 2-3
+      name: vehicle speed
+      type: uint16
+      unit: kph
+    - byte: 4
+      bit: 0-1
+      name: park brake status
+      type: bit
+      values:
+        00: park brake released
+        01: park brake engaged
+    - byte: 4
+      bit: 2-3
+      name: transmission lock status
+      type: bit
+      values:
+        00: transmission not locked
+        01: transmission locked
+    - byte: 4
+      bit: 4-5
+      name: engine lock status
+      type: bit
+      values:
+        00: engine free to start
+        01: engine locked
+    - byte: 5
+      bit: 0-1
+      name: ignition switch status
+      type: bit
+      values:
+        00: off
+        01: on
+    - byte: 5
+      bit: 2-4
+      name: accessory switch status
+      type: bit
+      values:
+        00: off
+        01: on
+    - byte: 6
+      name: transmission current gear
+      type: byte
+      values:
+        124: reverse 1
+        125: neutral
+        126: forward 1
+        127: forward 2
+        128: forward 3
+        129: forward 4
+        130: forward 5
+        131: forward 6
+        132: forward 7
+        251: park
+    - byte: 7
+      name: transmission gear selected
+      type: byte
+      values:
+        124: reverse 1
+        125: neutral
+        126: forward 1
+        127: forward 2
+        128: forward 3
+        129: forward 4
+        130: forward 5
+        131: forward 6
+        132: forward 7
+        251: park
+
+1FFF3:
+  name: CHASSIS_MOBILITY_COMMAND
+  parameters:
+    - byte: 0
+      bit: 0-1
+      name: park brake command
+      type: bit
+      values:
+        00: please release chassis
+        01: please immobilize chassis
+        10: error
+        11: do not care about status
+    - byte: 0
+      bit: 2-3
+      name: park brake user override
+      type: bit
+      values:
+        00: normal priority
+        01: override
+        10: error
+        11: na
+    - byte: 1
+      bit: 0-1
+      name: transmission command
+      type: bit
+      values:
+        00: please release transmission
+        01: please lock transmission
+        10: error
+        11: do not care about status
+    - byte: 1
+      bit: 2-3
+      name: transmission lock user override
+      type: bit
+      values:
+        00: normal priority
+        01: override
+        10: error
+        11: na
+    - byte: 2
+      bit: 0-1
+      name: engine lock command
+      type: bit
+      values:
+        00: please release engine
+        01: please lock engine
+        10: error
+        11: do not care about status
+    - byte: 2
+      bit: 2-3
+      name: engine lock user override
+      type: bit
+      values:
+        00: normal priority
+        01: override
+        10: error
+        11: na
+
+1FFF2:
+  name: AAS_CONFIG_STATUS
+  parameters:
+    - byte: 0
+      name: left front sensor mode
+      type: uint8
+      unit: Pct
+    - byte: 1
+      name: right front sensor mode
+      type: uint8
+      unit: Pct
+    - byte: 2
+      name: right rear sensor mode
+      type: uint8
+      unit: Pct
+    - byte: 3
+      name: left rear sensor mode
+      type: uint8
+      unit: Pct
+    - byte: 4
+      name: height correction threshold time
+      type: uint8
+      unit: min
+    - byte: 5
+      name: solenoid on time
+      type: uint8
+      unit: min
+
+1FFF1:
+  name: AAS_COMMAND
+  alias: 1FFF2
+
+1FFF0:
+  name: AAS_STATUS
+  parameters:
+    - byte: 0
+      bit: 0-1
+      name: aas operating status
+      type: bit
+      values:
+        00: off
+        01: on
+    - byte: 0
+      bit: 2-5
+      name: aas mode
+      type: uint4
+      values:
+        0000: normal
+        0001: fly mode
+        0010: reset
+        1110: error
+        1111: na
+    - byte: 1
+      name: left front sensor mode
+      type: uint8
+      unit: Pct
+    - byte: 2
+      name: right front sensor mode
+      type: uint8
+      unit: Pct
+    - byte: 3
+      name: right rear sensor mode
+      type: uint8
+      unit: Pct
+    - byte: 4
+      name: left rear sensor mode
+      type: uint8
+      unit: Pct
+    - byte: 5
+      bit: 0-1
+      name: tag axle position
+      type: bit
+      values:
+        00: down
+        01: up
+
+1FFEF:
+  name: AAS_SENSOR_STATUS
+  parameters:
+    - byte: 0
+      bit: 0-1
+      name: left front sensor status low ride
+      type: uint8
+      values:
+        0: under set point
+        1: over set point
+    - byte: 0
+      bit: 2-3
+      name: left front sensor status medium ride
+      type: uint8
+      values:
+        0: under set point
+        1: over set point
+    - byte: 0
+      bit: 4-5
+      name: left front sensor status high ride
+      type: uint8
+      values:
+        0: under set point
+        1: over set point
+    - byte: 0
+      bit: 6-7
+      name: left front sensor transition
+      type: uint8
+      values:
+        0: no transition
+        1: transition was made
+    - byte: 1
+      bit: 0-1
+      name: left front quadrature encoder status channel A
+      type: uint8
+    - byte: 1
+      bit: 2-3
+      name: left front quadrature encoder status channel B
+      type: uint8
+    - byte: 2
+      bit: 0-1
+      name: right front sensor status low ride
+      type: uint8
+      values:
+        0: under set point
+        1: over set point
+    - byte: 2
+      bit: 2-3
+      name: right front sensor status medium ride
+      type: uint8
+      values:
+        0: under set point
+        1: over set point
+    - byte: 2
+      bit: 4-5
+      name: right front sensor status high ride
+      type: uint8
+      values:
+        0: under set point
+        1: over set point
+    - byte: 2
+      bit: 6-7
+      name: right front sensor transition
+      type: uint8
+      values:
+        0: no transition
+        1: transition was made
+    - byte: 3
+      bit: 0-1
+      name: right front quadrature encoder status channel A
+      type: uint8
+    - byte: 3
+      bit: 2-3
+      name: right front quadrature encoder status channel B
+      type: uint8
+    - byte: 3
+      bit: 4-5
+      name: steering sensor quadrature encoder status channel A
+      type: uint8
+    - byte: 3
+      bit: 6-7
+      name: steering sensor quadrature encoder status channel B
+      type: uint8
+    - byte: 4
+      bit: 0-1
+      name: left rear sensor status low ride
+      type: uint8
+      values:
+        0: under set point
+        1: over set point
+    - byte: 4
+      bit: 2-3
+      name: left rear sensor status medium ride
+      type: uint8
+      values:
+        0: under set point
+        1: over set point
+    - byte: 4
+      bit: 4-5
+      name: left rear sensor status high ride
+      type: uint8
+      values:
+        0: under set point
+        1: over set point
+    - byte: 4
+      bit: 6-7
+      name: left rear sensor transition
+      type: uint8
+      values:
+        0: no transition
+        1: transition was made
+    - byte: 5
+      bit: 0-1
+      name: left rear quadrature encoder status channel A
+      type: uint8
+    - byte: 5
+      bit: 2-3
+      name: left rear quadrature encoder status channel B
+      type: uint8
+    - byte: 6
+      bit: 0-1
+      name: right rear sensor status low ride
+      type: uint8
+      values:
+        0: under set point
+        1: over set point
+    - byte: 6
+      bit: 2-3
+      name: right rear sensor status medium ride
+      type: uint8
+      values:
+        0: under set point
+        1: over set point
+    - byte: 6
+      bit: 4-5
+      name: right rear sensor status high ride
+      type: uint8
+      values:
+        0: under set point
+        1: over set point
+    - byte: 6
+      bit: 6-7
+      name: right rear sensor transition
+      type: uint8
+      values:
+        0: no transition
+        1: transition was made
+    - byte: 7
+      bit: 0-1
+      name: right rear quadrature encoder status channel A
+      type: uint8
+    - byte: 7
+      bit: 2-3
+      name: right rear quadrature encoder status channel B
+      type: uint8
+
+1FED1:
+  name: SUSPENSION_AIR_PRESSURE_STATUS
+  parameters:
+    - byte: 0
+      name: suspension system supply pressure
+      type: uint8
+    - byte: 1
+      name: steer axle left air spring
+      type: uint8
+    - byte: 2
+      name: steer axle right air spring
+      type: uint8
+    - byte: 3
+      name: drive axle left air spring
+      type: uint8
+    - byte: 4
+      name: drive axle right air spring
+      type: uint8
+    - byte: 5
+      name: tag axle left air spring
+      type: uint8
+    - byte: 6
+      name: tag axle left right spring
+      type: uint8
+
+1FFEE:
+  name: LEVELING_CONTROL_COMMAND
+
+1FFED:
+  name: LEVELING_CONTROL_STATUS
+
+1FFEC:
+  name: LEVELING_JACK_STATUS
+
+1FFEB:
+  name: LEVELING_SENSOR_STATUS
+
+1FFEA:
+  name: HYDRAULIC_PUMP_STATUS
+
+1FEBC:
+  name: HYDRAULIC_PUMP_COMMAND
+
+1FFE9:
+  name: LEVELING_AIR_STATUS
+
+1FFE8:
+  name: SLIDE_STATUS
+
+1FFE7:
+  name: SLIDE_COMMAND
+
+1FFE6:
+  name: SLIDE_SENSOR_STATUS
+
+1FFE5:
+  name: SLIDE_MOTOR_STATUS
+
+1FFE4:
+  name: FURNACE_STATUS
+
+1FFE3:
+  name: FURNACE_COMMAND
+
+1FFE2:
+  name: THERMOSTAT_STATUS_1
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+      comment: Corresponds to "Zones" in user terminology.
+    - byte: 1
+      bit: 0-3
+      name: operating mode
+      type: bit4
+      values:
+        0000: off
+        0001: cool
+        0010: heat
+        0011: auto
+        0100: fan only
+    - byte: 1
+      bit: 4-5
+      name: fan mode
+      type: bit
+      values:
+        00: auto
+        01: on
+      comment: This forces the fan to be on all the time, but allows heat and cool to turn on and off according to the Operating Mode.
+    - byte: 1
+      bit: 6-7
+      name: schedule mode
+      type: bit
+      values:
+        00: disabled
+        01: enabled
+      comment: If enabled, the set point will change according to programmed scheduled.
+    - byte: 2
+      name: fan speed
+      type: uint8
+      unit: Pct
+    - byte: 3-4
+      name: setpoint temp heat
+      type: uint16
+      unit: Deg C
+    - byte: 5-6
+      name: setpoint temp cool
+      type: uint16
+      unit: Deg C
+
+1FEFA:
+  name: THERMOSTAT_STATUS_2
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+      comment: Corresponds to "Zones" in user terminology.
+    - byte: 1
+      name: current schedule instance
+      type: uint8
+    - byte: 2
+      name: number of schedule instances
+      type: uint8
+
+1FEF9:
+  name: THERMOSTAT_COMMAND_1
+  alias: 1FFE2
+
+1FEF8:
+  name: THERMOSTAT_COMMAND_2
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+      comment: Corresponds to "Zones" in user terminology.
+    - byte: 1
+      name: current schedule instance
+      type: uint8
+
+1FEF7:
+  name: THERMOSTAT_SCHEDULE_STATUS_1
+
+1FEF6:
+  name: THERMOSTAT_SCHEDULE_STATUS_2
+
+1FEF5:
+  name: THERMOSTAT_SCHEDULE_COMMAND_1
+
+1FEF4:
+  name: THERMOSTAT_SCHEDULE_COMMAND_2
+
+1FF9C:
+  name: THERMOSTAT_AMBIENT_STATUS
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+      comment: Corresponds to "Zones" in user terminology.
+    - byte: 1-2
+      name: ambient temp
+      type: uint16
+      unit: Deg C
+
+1FFE1:
+  name: AIR_CONDITIONER_STATUS
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+    - byte: 1
+      name: operating mode
+      type: uint8
+      values:
+        0: automatic
+        1: manual
+    - byte: 2
+      name: max fan speed
+      type: uint8
+      unit: Pct
+    - byte: 3
+      name: max air conditioning output level
+      type: uint8
+      unit: Pct
+    - byte: 4
+      name: fan speed
+      type: uint8
+      unit: Pct
+    - byte: 5
+      name: air conditioning output level
+      type: uint8
+      unit: Pct
+    - byte: 6
+      name: dead band
+      unit: uint8
+    - byte: 7
+      name: second stage dead band
+      unit: uint8
+
+1FFE0:
+  name: AIR_CONDITIONER_COMMAND
+  alias: 1FFE1
+
+1FF9B:
+  name: HEAT_PUMP_STATUS
+
+1FF9A:
+  name: HEAT_PUMP_COMMAND
+  alias: 1FF9B
+
+1FFDF:
+  name: GENERATOR_AC_STATUS_1
+  alias: Z0000
+  parameters:
+    - byte: 0
+      bit: 0-3
+      name: instance
+      type: bit4
+    - byte: 0
+      bit: 4-7
+      name: line
+      type: bit4
+
+1FFDE:
+  name: GENERATOR_AC_STATUS_2
+  alias: Z0001
+  parameters:
+    - byte: 0
+      bit: 0-3
+      name: instance
+      type: bit4
+    - byte: 0
+      bit: 4-7
+      name: line
+      type: bit4
+
+1FFDD:
+  name: GENERATOR_AC_STATUS_3
+  alias: Z0002
+  parameters:
+    - byte: 0
+      bit: 0-3
+      name: instance
+      type: bit4
+    - byte: 0
+      bit: 4-7
+      name: line
+      type: bit4
+
+1FF94:
+  name: GENERATOR_AC_STATUS_4
+  alias: Z0003
+  parameters:
+    - byte: 0
+      bit: 0-3
+      name: instance
+      type: bit4
+    - byte: 0
+      bit: 4-7
+      name: line
+      type: bit4
+
+1FEC6:
+  name: GENERATOR_DC_STATUS_1
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+    - byte: 1-2
+      name: charge voltage
+      type: uint16
+      unit: v
+    - byte: 3-4
+      name: charge current
+      type: uint16
+      unit: a
+    - byte: 5
+      name: charge current percent of maximum
+      type: uint8
+      unit: pct
+    - byte: 6
+      name: operating state
+      type: uint8
+
+1FEC5:
+  name: GENERATOR_DC_CONFIGURATION_STATUS
+
+1FEC4:
+  name: GENERATOR_DC_COMMAND
+
+1FEC3:
+  name: GENERATOR_DC_CONFIGURATION_COMMAND
+
+1FEC2:
+  name: GENERATOR_DC_EQUALIZATION_STATUS
+
+1FEC1:
+  name: GENERATOR_DC_EQUALIZATION_CONFIGURATION_STATUS
+
+1FEC0:
+  name: GENERATOR_DC_EQUALIZATION_CONFIGURATION_COMMAND
+
+1FFDC:
+  name: GENERATOR_STATUS_1
+  parameters:
+    - byte: 0
+      name: status
+      type: uint8
+      values:
+        0: stopped
+        1: preheat
+        2: cranking
+        3: running
+        4: priming
+        5: fault
+        6: engine run only
+        7: test mode
+        8: voltage adjust mode
+        9: fault bypass mode
+        10: configuration mode
+    - byte: 1-4
+      name: engine run time
+      type: uint32
+    - byte: 5
+      name: engine load
+      type: uint8
+      unit: pct
+    - byte: 6-7
+      name: start battery voltage
+      type: uint16
+      unit: v
+
+1FFDB:
+  name: GENERATOR_STATUS_2
+  parameters:
+    - byte: 0
+      bit: 0-1
+      name: temperature shutdown switch
+      type: uint8
+      values:
+        0: temperature shutdown not active
+        1: temperature shutdown active
+    - byte: 0
+      bit: 2-3
+      name: oil pressure shutdown switch
+      type: uint8
+      values:
+        0: oil pressure shutdown not active
+        1: oil pressure shutdown active
+    - byte: 0
+      bit: 4-5
+      name: oil level shutdown switch
+      type: uint8
+      values:
+        0: oil level switch not active
+        1: low oil level detected
+    - byte: 0
+      bit: 6-7
+      name: caution light
+      type: uint8
+      values:
+        0: caution light off
+        1: caution light on
+    - byte: 1
+      name: engine coolant temperature
+      type: uint8
+      unit: deg c
+    - byte: 2
+      name: engine oil pressure
+      type: uint8
+      unit: kPa
+    - byte: 3-4
+      name: engine rpm
+      type: uint16
+      unit: RPM
+    - byte: 5-6
+      name: fuel rate
+      type: uint16
+      unit: lph
+
+1FFDA:
+  name: GENERATOR_COMMAND
+  parameters:
+    - byte: 0
+      name: command
+      type: uint8
+      values:
+        0: stop
+        1: start
+        2: manual prime
+        3: manual preheat
+
+1FFD9:
+  name: GENERATOR_START_CONFIG_STATUS
+
+1FFD8:
+  name: GENERATOR_START_CONFIG_COMMAND
+
+1FFD7:
+  name: INVERTER_AC_STATUS_1
+  alias: Z0000
+  parameters:
+    - byte: 0
+      bit: 0-3
+      name: instance
+      type: uint8
+    - byte: 0
+      bit: 4-5
+      name: line
+      type: bit2
+      values:
+        00: 1
+        01: 2
+    - byte: 0
+      bit: 6-7
+      name: input/output
+      type: bit2
+      values:
+        00: input
+        01: output
+
+1FFD6:
+  name: INVERTER_AC_STATUS_2
+  alias: Z0001
+  parameters:
+    - byte: 0
+      bit: 0-3
+      name: instance
+      type: uint8
+    - byte: 0
+      bit: 4-5
+      name: line
+      type: bit2
+      values:
+        00: 1
+        01: 2
+    - byte: 0
+      bit: 6-7
+      name: input/output
+      type: bit2
+      values:
+        00: input
+        01: output
+
+1FFD5:
+  name: INVERTER_AC_STATUS_3
+  alias: Z0002
+  parameters:
+    - byte: 0
+      bit: 0-3
+      name: instance
+      type: uint8
+    - byte: 0
+      bit: 4-5
+      name: line
+      type: bit2
+      values:
+        00: 1
+        01: 2
+    - byte: 0
+      bit: 6-7
+      name: input/output
+      type: bit2
+      values:
+        00: input
+        01: output
+
+1FF8F:
+  name: INVERTER_AC_STATUS_4
+  alias: Z0003
+  parameters:
+    - byte: 0
+      bit: 0-3
+      name: instance
+      type: uint8
+    - byte: 0
+      bit: 4-5
+      name: line
+      type: bit2
+      values:
+        00: 1
+        01: 2
+    - byte: 0
+      bit: 6-7
+      name: input/output
+      type: bit2
+      values:
+        00: input
+        01: output
+
+1FF8E:
+  name: INVERTER_ACFAULT_CONFIGURATION_STATUS_1
+  alias: Z0004
+
+1FF8D:
+  name: INVERTER_ACFAULT_CONFIGURATION_STATUS_2
+  alias: Z0005
+
+1FF8C:
+  name: INVERTER_ACFAULT_CONFIGURATION_COMMAND_1
+  alias: Z0004
+
+1FF8B:
+  name: INVERTER_ACFAULT_CONFIGURATION_COMMAND_2
+  alias: Z0005
+
+# The RV-C spec incorrectly lists load sense as bits 2-4.
+1FFD4:
+  name: INVERTER_STATUS
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+    - byte: 1
+      name: status
+      type: uint8
+      values:
+        0: disabled
+        1: invert
+        2: ac passthru
+        3: aps only
+        4: load sense
+        5: waiting to invert
+    - byte: 2
+      bit: 0-1
+      name: battery temperature sensor present
+      type: bit2
+      values:
+        00: no sensor in use
+        01: sensor present and active
+    - byte: 2
+      bit: 2-3
+      name: load sense enabled
+      type: bit2
+      values:
+        00: load sense disabled
+        01: load sense enabled
+
+1FFD3:
+  name: INVERTER_COMMAND
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+    - byte: 1
+      bit: 0-1
+      name: inverter enable
+      type: bit
+      values:
+        00: disable
+        01: enable
+    - byte: 1
+      bit: 2-3
+      name: load sense enable
+      type: bit
+      values:
+        00: disable
+        01: enable
+    - byte: 1
+      bit: 4-5
+      name: pass-through enable
+      type: bit
+      values:
+        00: disable
+        01: enable
+    - byte: 7
+      bit: 0-1
+      name: inverter enable on startup
+      type: bit
+      values:
+        00: disable
+        01: enable
+    - byte: 7
+      bit: 2-3
+      name: load sense enable on startup
+      type: bit
+      values:
+        00: disable
+        01: enable
+    - byte: 7
+      bit: 0-1
+      name: pass-through enable on startup
+      type: bit
+      values:
+        00: disable
+        01: enable
+
+1FFD2:
+  name: INVERTER_CONFIGURATION_STATUS_1
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+    - byte: 1-2
+      name: load sense power threshold
+      type: uint16
+      unit: w
+    - byte: 3-4
+      name: load sense interval
+      type: uint16
+      unit: sec
+    - byte: 5-6
+      name: dc source shutdown voltage minimum
+      type: uint16
+      unit: v
+    - byte: 7
+      bit: 0-1
+      name: inverter enable on startup
+      type: uint8
+      values:
+        0: disabled
+        1: enabled
+    - byte: 7
+      bit: 2-3
+      name: load sense enable on startup
+      type: uint8
+      values:
+        0: disabled
+        1: enabled
+    - byte: 7
+      bit: 4-5
+      name: ac pass-through enable on startup
+      type: uint8
+      values:
+        0: disabled
+        1: enabled
+
+1FFD1:
+  name: INVERTER_CONFIGURATION_STATUS_2
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+    - byte: 1-2
+      name: dc source shutdown voltage maximum
+      type: uint16
+      unit: v
+    - byte: 3-4
+      name: dc source warning voltage minimum
+      type: uint16
+      unit: v
+    - byte: 5-6
+      name: dc source shutdown voltage maximum
+      type: uint16
+      unit: v
+
+1FECE:
+  name: INVERTER_CONFIGURATION_STATUS_3
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+    - byte: 1-2
+      name: dc source shutdown delay
+      type: uint16
+      unit: sec
+    - byte: 3
+      name: stack mode
+      type: uint8
+      values:
+        0: stand-alone
+        1: master
+        2: slave
+        3: line 2 master
+
+1FFD0:
+  name: INVERTER_CONFIGURATION_COMMAND_1
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+    - byte: 1-2
+      name: load sense power threshold
+      type: uint16
+      unit: w
+    - byte: 3-4
+      name: load sense interval
+      type: uint16
+      unit: sec
+    - byte: 5-6
+      name: dc source shutdown voltage minimum
+      type: uint16
+      unit: v
+
+1FFCF:
+  name: INVERTER_CONFIGURATION_COMMAND_2
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+    - byte: 1-2
+      name: dc source shutdown voltage maximum
+      type: uint16
+      unit: v
+    - byte: 3-4
+      name: dc source warning voltage minimum
+      type: uint16
+      unit: v
+    - byte: 5-6
+      name: dc source shutdown voltage maximum
+      type: uint16
+      unit: v
+
+1FECD:
+  name: INVERTER_CONFIGURATION_COMMAND_3
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+    - byte: 1-2
+      name: dc source shutdown delay
+      type: uint16
+      unit: sec
+    - byte: 3
+      name: stack mode
+      type: uint8
+      values:
+        0: stand-alone
+        1: master
+        2: slave
+        3: line 2 master
+
+1FFCE:
+  name: INVERTER_STATISTIC_STATUS
+
+1FFCD:
+  name: INVERTER_APS_STATUS
+
+1FFCC:
+  name: INVERTER_DCBUS_STATUS
+
+1FFCB:
+  name: INVERTER_OPE_STATUS
+
+1FEE8:
+  name: INVERTER_DC_STATUS
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+    - byte: 1-2
+      name: dc voltage
+      type: uint16
+      unit: v
+    - byte: 3-4
+      name: dc amperage
+      type: uint16
+      unit: a
+
+1FEBD:
+  name: INVERTER_TEMPERATURE_STATUS
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+    - byte: 1-2
+      name: fet temperature
+      type: uint16
+      unit: deg c
+    - byte: 3-4
+      name: transformer temperature
+      type: uint16
+      unit: deg c
+
+1FFCA:
+  name: CHARGER_AC_STATUS_1
+  alias: Z0000
+  parameters:
+    - byte: 0
+      bit: 0-3
+      name: instance
+      type: uint8
+    - byte: 0
+      bit: 4-5
+      name: line
+      type: bit2
+      values:
+        00: 1
+        01: 2
+    - byte: 0
+      bit: 6-7
+      name: input/output
+      type: bit2
+      values:
+        00: input
+        01: output
+
+1FFC9:
+  name: CHARGER_AC_STATUS_2
+  alias: Z0001
+  parameters:
+    - byte: 0
+      bit: 0-3
+      name: instance
+      type: uint8
+    - byte: 0
+      bit: 4-5
+      name: line
+      type: bit2
+      values:
+        00: 1
+        01: 2
+    - byte: 0
+      bit: 6-7
+      name: input/output
+      type: bit2
+      values:
+        00: input
+        01: output
+
+1FFC8:
+  name: CHARGER_AC_STATUS_3
+  alias: Z0002
+  parameters:
+    - byte: 0
+      bit: 0-3
+      name: instance
+      type: uint8
+    - byte: 0
+      bit: 4-5
+      name: line
+      type: bit2
+      values:
+        00: 1
+        01: 2
+    - byte: 0
+      bit: 6-7
+      name: input/output
+      type: bit2
+      values:
+        00: input
+        01: output
+
+1FF8A:
+  name: CHARGER_AC_STATUS_4
+  alias: Z0003
+  parameters:
+    - byte: 0
+      bit: 0-3
+      name: instance
+      type: uint8
+    - byte: 0
+      bit: 4-5
+      name: line
+      type: bit2
+      values:
+        00: 1
+        01: 2
+    - byte: 0
+      bit: 6-7
+      name: input/output
+      type: bit2
+      values:
+        00: input
+        01: output
+
+1FF89:
+  name: CHARGER_ACFAULT_CONFIGURATION_STATUS_1
+  alias: Z0004
+
+1FF88:
+  name: CHARGER_ACFAULT_CONFIGURATION_STATUS_2
+  alias: Z0005
+
+1FF87:
+  name: CHARGER_ACFAULT_CONFIGURATION_COMMAND_1
+  alias: Z0004
+
+1FF86:
+  name: CHARGER_ACFAULT_CONFIGURATION_COMMAND_2
+  alias: Z0005
+
+1FFC7:
+  name: CHARGER_STATUS
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+    - byte: 1-2
+      name: charge voltage
+      type: uint16
+      unit: v
+    - byte: 3-4
+      name: charge current
+      type: uint16
+      unit: a
+    - byte: 5
+      name: charge current percent of maximum
+      type: uint8
+      unit: pct
+    - byte: 6
+      name: operating state
+      type: uint8
+      values:
+        0: undefined
+        1: do not charge
+        2: bulk
+        3: absorption
+        4: overcharge
+        5: equalize
+        6: float
+        7: constant voltage/current
+    - byte: 7
+      bit: 0-1
+      name: default state on power-up
+      type: bit2
+      values:
+        00: disabled
+        01: enabled
+    - byte: 7
+      bit: 2-3
+      name: auto recharge enable
+      type: bit2
+      values:
+        00: disabled
+        01: enabled
+    - byte: 7
+      bit: 4-7
+      name: force charge
+      type: uint8
+      values:
+        0: charging not forced
+        1: force charge to bulk
+        2: force charge to float
+
+1FFC6:
+  name: CHARGER_CONFIGURATION_STATUS
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+    - byte: 1
+      name: charging algorithm
+      type: uint8
+      values:
+        0: constant voltage
+        1: constant current
+        2: 3-stage
+        3: 2-stage
+        4: trickle
+        249: custom 2
+        250: custom 1
+    - byte: 2
+      name: charger mode
+      type: uint8
+      values:
+        0: stand-alone
+        1: primary
+        2: secondary
+        3: linked to dc source
+    - byte: 3
+      bit: 0-1
+      name: battery sensor present
+      type: uint8
+      values:
+        0: no sensor in use
+        1: sensor present and active
+    - byte: 3
+      bit: 2-3
+      name: charger installation line
+      type: uint8
+      values:
+        0: 1
+        1: 2
+    - byte: 3
+      bit: 4-7
+      name: battery type
+      type: uint4
+      values:
+        0: flooded
+        1: gel
+        2: agm
+        3: lithium iron phosphate
+    - byte: 4-5
+      name: battery bank size
+      type: uint16
+      unit: ah
+    - byte: 6-7
+      name: maximum charging current
+      type: uint16
+      unit: a
+
+1FFC5:
+  name: CHARGER_COMMAND
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+    - byte: 1
+      name: status
+      type: uint8
+      values:
+        0: disable
+        1: enable charger
+        2: start equalization
+    - byte: 2
+      bit: 0-1
+      name: default state on power-up
+      type: uint8
+      values:
+        0: disabled
+        1: enabled
+    - byte: 2
+      bit: 2-3
+      name: auto recharge enable
+      type: uint8
+      values:
+        0: disabled
+        1: enabled
+    - byte: 2
+      bit: 4-7
+      name: force charge
+      type: uint8
+      values:
+        0: cancel forcing
+        1: force charge to bulk
+        2: force charge to float
+
+1FFC4:
+  name: CHARGER_CONFIGURATION_COMMAND
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+    - byte: 1
+      name: charging algorithm
+      type: uint8
+      values:
+        0: constant voltage
+        1: constant current
+        2: 3-stage
+        3: 2-stage
+        4: trickle
+        249: custom 2
+        250: custom 1
+    - byte: 2
+      name: charger mode
+      type: uint8
+      values:
+        0: stand-alone
+        1: primary
+        2: secondary
+        3: linked to dc source
+    - byte: 3
+      bit: 0-1
+      name: battery sensor present
+      type: uint8
+      values:
+        0: no sensor in use
+        1: sensor present and active
+    - byte: 3
+      bit: 2-3
+      name: charger installation line
+      type: uint8
+      values:
+        0: 1
+        1: 2
+    - byte: 4-5
+      name: battery bank size
+      type: uint16
+      unit: ah
+    - byte: 6
+      bit: 0-3
+      name: battery type
+      type: uint4
+      values:
+        0: flooded
+        1: gel
+        2: agm
+        3: lithium iron phosphate
+    - byte: 7
+      name: maximum charging current
+      type: uint8
+      unit: a
+
+1FF96:
+  name: CHARGER_CONFIGURATION_STATUS_2
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+    - byte: 1
+      name: maximum charge current as percent
+      type: uint8
+      unit: pct
+    - byte: 2
+      name: charge rate limit as percent of bank size
+      type: uint8
+      unit: pct
+    - byte: 3
+      name: shore breaker size
+      type: uint8
+      unit: a
+    - byte: 4
+      name: default battery temperature
+      type: uint8
+      unit: deg c
+    - byte: 5-6
+      name: recharge voltage
+      type: uint16
+      unit: v
+
+1FF95:
+  name: CHARGER_CONFIGURATION_COMMAND_2
+  alias: 1FF96
+
+1FECC:
+  name: CHARGER_CONFIGURATION_STATUS_3
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+    - byte: 1-2
+      name: bulk voltage
+      type: uint16
+      unit: v
+    - byte: 3-4
+      name: absorption voltage
+      type: uint16
+      unit: v
+    - byte: 5-6
+      name: float voltage
+      type: uint16
+      unit: v
+    - byte: 7
+      name: temperature compensation constant
+      type: uint8
+      unit: mV/K
+
+1FECB:
+  name: CHARGER_CONFIGURATION_COMMAND_3
+  alias: 1FECC
+
+1FEBF:
+  name: CHARGER_CONFIGURATION_STATUS_4
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+    - byte: 1-2
+      name: bulk time
+      type: uint16
+      unit: min
+    - byte: 3-4
+      name: absorption time
+      type: uint16
+      unit: min
+    - byte: 5-6
+      name: float time
+      type: uint16
+      unit: min
+
+1FEBE:
+  name: CHARGER_CONFIGURATION_COMMAND_4
+  alias: 1FEBF
+
+1FF99:
+  name: CHARGER_EQUALIZATION_STATUS
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+    - byte: 1-2
+      name: time remaining
+      type: uint16
+      unit: min
+    - byte: 3
+      bit: 0-1
+      name: pre-charging status
+      type: uint8
+      values:
+        0: pre-charging not in process
+        1: charging batteries to prepare for equalization
+
+1FF98:
+  name: CHARGER_EQUALIZATION_CONFIGURATION_STATUS
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+    - byte: 1-2
+      name: equalization voltage
+      type: uint16
+      unit: v
+    - byte: 3-4
+      name: equalization time
+      type: uint16
+      unit: min
+
+1FF97:
+  name: CHARGER_EQUALIZATION_CONFIGURATION_COMMAND
+  alias: 1FF98
+
+1FEBB:
+  name: GENERIC_AC_STATUS_1
+  alias: Z0000
+  parameters:
+    - byte: 0
+      bit: 0-3
+      name: instance
+      type: bit4
+    - byte: 0
+      bit: 4-7
+      name: line
+      type: uint8
+
+1FEBA:
+  name: GENERIC_AC_STATUS_2
+  alias: Z0001
+  parameters:
+    - byte: 0
+      bit: 0-3
+      name: instance
+      type: bit4
+    - byte: 0
+      bit: 4-7
+      name: line
+      type: uint8
+
+1FEB9:
+  name: GENERIC_AC_STATUS_3
+  alias: Z0002
+  parameters:
+    - byte: 0
+      bit: 0-3
+      name: instance
+      type: bit4
+    - byte: 0
+      bit: 4-7
+      name: line
+      type: uint8
+
+1FEB8:
+  name: GENERIC_AC_STATUS_4
+  alias: Z0003
+  parameters:
+    - byte: 0
+      bit: 0-3
+      name: instance
+      type: bit4
+    - byte: 0
+      bit: 4-7
+      name: line
+      type: uint8
+
+1FEB7:
+  name: GENERIC_ACFAULT_CONFIGURATION_STATUS_1
+  alias: Z0004
+
+1FEB6:
+  name: GENERIC_ACFAULT_CONFIGURATION_STATUS_2
+  alias: Z0005
+
+1FEB5:
+  name: GENERIC_ACFAULT_CONFIGURATION_COMMAND_1
+  alias: Z0004
+
+1FEB4:
+  name: GENERIC_ACFAULT_CONFIGURATION_COMMAND_2
+  alias: Z0005
+
+1FFBF:
+  name: AC_LOAD_STATUS
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+    - byte: 1
+      name: group
+      type: uint8
+      unit: bitmap
+    - byte: 2
+      name: operating status
+      type: uint8
+      unit: Pct
+    - byte: 3
+      bit: 0-1
+      name: operating mode
+      type: bit2
+      values:
+        00: automatic
+        01: manual
+    - byte: 3
+      bit: 2-3
+      name: variable level capability
+      type: bit2
+      values:
+        00: not variable
+        01: variable
+    - byte: 3
+      bit: 4-7
+      name: priority
+      type: bit4
+      values:
+        0000: highest priority
+        1101: lowest priority
+        1110: error
+        1111: no data
+    - byte: 4
+      name: delay
+      type: uint8
+    - byte: 5
+      name: demanded current
+      type: uint8
+      unit: A
+    - byte: 6-7
+      name: present current
+      type: uint16
+      unit: A
+
+1FEDD:
+  name: AC_LOAD_STATUS_2
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+    - byte: 1
+      bit: 0-1
+      name: lock status
+      type: bit2
+      values:
+        00: unlocked
+        01: locked
+        11: lock command not supported
+    - byte: 1
+      bit: 2-3
+      name: overcurrent status
+      type: bit2
+      values:
+        00: not in overcurrent
+        01: in overcurrent
+        11: status not available
+    - byte: 1
+      bit: 4-5
+      name: override status
+      type: bit2
+      values:
+        00: override inactive
+        01: override active
+        11: override status unavailable
+    - byte: 1
+      bit: 6-7
+      name: enable status
+      type: bit2
+      values:
+        00: enabled
+        01: disabled
+        11: enable status unavailable
+    - byte: 2
+      name: last command
+      type: uint8
+      values:
+        0: set level
+        1: on
+        2: on delay
+        3: off
+        4: stop
+        5: toggle
+        6: memory off
+        33: lock
+        34: unlock
+        49: flash
+    - byte: 3
+      bit: 0-1
+      name: interlock status
+      type: bit2
+      values:
+        00: interlock not active
+        01: interlock active
+        02: interlock not supported
+
+1FFBE:
+  name: AC_LOAD_COMMAND
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+    - byte: 1
+      name: group
+      type: uint8
+      unit: bitmap
+    - byte: 2
+      name: desired level
+      type: uint8
+      unit: pct
+    - byte: 3
+      bit: 0-1
+      name: desired operating mode
+      type: bit2
+      values:
+        00: automatic
+        01: manual
+    - byte: 3
+      bit: 2-3
+      name: interlock
+      type: bit2
+      values:
+        00: no interlock active
+        01: interlock a
+        10: interlock b
+    - byte: 3
+      bit: 4-7
+      name: priority
+      type: bit4
+      values:
+        0000: highest priority
+        1101: lowest priority
+        1110: error
+        1111: no data
+    - byte: 4
+      name: command
+      type: uint8
+      values:
+        0: set level
+        1: on duration
+        2: on delay
+        3: off
+        4: stop
+        5: toggle
+        6: memory off
+        17: ramp brightness
+        18: ramp toggle
+        19: ramp up
+        20: ramp down
+        21: ramp up/down
+        22: increment one level
+        23: decrement one level
+        33: lock
+        34: unlock
+        49: flash
+        50: flash momentarily
+    - byte: 5
+      name: delay/duration
+      type: uint8
+
+1FFBD:
+  name: DC_LOAD_STATUS
+  alias: 1FFBF
+
+1FEDC:
+  name: DC_LOAD_STATUS_2
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+    - byte: 1
+      bit: 0-1
+      name: lock status
+      type: bit2
+      values:
+        00: unlocked
+        01: locked
+        11: lock command not supported
+    - byte: 1
+      bit: 2-3
+      name: overcurrent status
+      type: bit2
+      values:
+        00: not in overcurrent
+        01: in overcurrent
+        11: status not available
+    - byte: 1
+      bit: 4-5
+      name: override status
+      type: bit2
+      values:
+        00: override inactive
+        01: override active
+        11: override status unavailable
+    - byte: 1
+      bit: 6-7
+      name: enable status
+      type: bit2
+      values:
+        00: enabled
+        01: disabled
+        11: enable status unavailable
+    - byte: 2
+      name: last command
+      type: uint8
+      values:
+        0: set level
+        1: on
+        2: on delay
+        3: off
+        4: stop
+        5: toggle
+        6: memory off
+        33: lock
+        34: unlock
+        49: flash
+    - byte: 3
+      bit: 0-1
+      name: interlock status
+      type: bit2
+      values:
+        00: interlock not active
+        01: interlock active
+        02: interlock not supported
+
+1FFBC:
+  name: DC_LOAD_COMMAND
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+    - byte: 1
+      name: group
+      type: uint8
+      unit: bitmap
+    - byte: 2
+      name: desired level
+      type: uint8
+      unit: pct
+    - byte: 3
+      bit: 0-1
+      name: desired operating mode
+      type: bit2
+      values:
+        00: automatic
+        01: manual
+    - byte: 3
+      bit: 2-3
+      name: interlock
+      type: bit2
+      values:
+        00: no interlock active
+        01: interlock a
+        10: interlock b
+    - byte: 4
+      name: command
+      type: uint8
+      values:
+        0: set level
+        1: on duration
+        2: on delay
+        3: off
+        4: stop
+        5: toggle
+        6: memory off
+        33: lock
+        34: unlock
+        49: flash
+    - byte: 5
+      name: delay/duration
+      type: uint8
+      unit: sec
+
+1FFBB:
+  name: DC_DIMMER_STATUS_1
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+    - byte: 1
+      name: master brightness
+      type: uint8
+      unit: Pct
+    - byte: 2
+      name: red brightness
+      type: uint8
+      unit: Pct
+    - byte: 3
+      name: green brightness
+      type: uint8
+      unit: Pct
+    - byte: 4
+      name: blue brightness
+      type: uint8
+      unit: Pct
+    - byte: 5
+      bit: 0-3
+      name: on duration
+      type: uint8
+    - byte: 5
+      bit: 4-7
+      name: off duration
+      type: uint8
+
+1FFBA:
+  name: DC_DIMMER_STATUS_2
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+    - byte: 1
+      name: master current
+      type: uint8
+      unit: A
+    - byte: 2
+      name: red current
+      type: uint8
+      unit: A
+    - byte: 3
+      name: green current
+      type: uint8
+      unit: A
+    - byte: 4
+      name: blue current
+      type: uint8
+      unit: A
+    - byte: 5
+      bit: 0-1
+      name: master fault
+      type: bit
+      values:
+        00: no fault
+        01: burnt bulb
+    - byte: 5
+      bit: 2-3
+      name: red fault
+      type: bit
+      values:
+        00: no fault
+        01: burnt bulb
+    - byte: 5
+      bit: 4-5
+      name: green fault
+      type: bit
+      values:
+        00: no fault
+        01: Burnt bulb
+    - byte: 5
+      bit: 6-7
+      name: blue fault
+      type: bit
+      values:
+        00: no fault
+        01: Burnt bulb
+
+1FEDA:
+  name: DC_DIMMER_STATUS_3
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+    - byte: 1
+      name: group
+      type: uint8
+      unit: bitmap
+    - byte: 2
+      name: operating status (brightness)
+      type: uint8
+      unit: Pct
+    - byte: 3
+      name: lock status
+      type: bit2
+      bit: 0-1
+      values:
+        00: load is unlocked
+        01: load is locked
+        11: lock command is not supported
+    - byte: 3
+      name: overcurrent status
+      type: bit2
+      bit: 2-3
+      values:
+        00: load is not in overcurrent
+        01: load is in overcurrent
+        11: overcurrent status is unavailable or not supported
+    - byte: 3
+      name: override status
+      type: bit2
+      bit: 4-5
+      values:
+        00: external override is inactive
+        01: external override is active
+        11: override status is unavailable or not supported
+    - byte: 3
+      name: enable status
+      type: bit2
+      bit: 6-7
+      values:
+        00: load is enabled
+        01: load is disabled
+        11: enable status is unavailable or not supported
+    - byte: 4
+      name: delay/duration
+      type: uint8
+    - byte: 5
+      name: last command
+      type: uint8
+      values:
+        0: set brightness
+        1: on duration
+        2: on delay
+        3: off
+        4: stop
+        5: toggle
+        6: memory off
+        17: ramp brightness
+        18: ramp toggle
+        19: ramp up
+        20: ramp down
+        21: ramp up/down
+        33: lock
+        34: unlock
+        49: flash
+        50: flash momentarily
+    - byte: 6
+      name: interlock status
+      type: bit2
+      bit: 0-1
+      values:
+        00: interlock command is not active
+        01: interlock command is active
+        11: interlock command is not supported
+    - byte: 6
+      name: load status
+      type: bit2
+      bit: 2-3
+      values:
+        00: operating status is zero
+        01: operating status is non-zero or flashing
+        11: interlock command is not supported
+
+1FFB9:
+  name: DC_DIMMER_COMMAND
+  alias: 1FFBB
+
+1FEDB:
+  name: DC_DIMMER_COMMAND_2
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+    - byte: 1
+      name: group
+      type: uint8
+      unit: bitmap
+    - byte: 2
+      name: desired level
+      type: uint8
+      unit: pct
+    - byte: 3
+      name: command
+      type: uint8
+      values:
+        0: set brightness
+        1: on duration
+        2: on delay
+        3: off
+        4: stop
+        5: toggle
+        6: memory off
+        17: ramp brightness
+        18: ramp toggle
+        19: ramp up
+        20: ramp down
+        21: ramp up/down
+        33: lock
+        34: unlock
+        49: flash
+        50: flash momentarily
+    - byte: 4
+      name: delay/duration
+      type: uint8
+    - byte: 5
+      bit: 0-1
+      name: interlock
+      type: bit2
+      values:
+        00: no interlock active
+        01: interlock a
+        10: interlock b
+
+1FFB8:
+  name: DIGITAL_INPUT_STATUS
+
+1FED7:
+  name: GENERIC_INDICATOR_STATUS
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+    - byte: 1
+      name: group
+      type: uint8
+      unit: bitmap
+    - byte: 2
+      name: brightness
+      type: uint8
+      unit: pct
+    - byte: 3
+      bit: 0-3
+      name: bank select
+      type: uint8
+    - byte: 4
+      name: delay/duration
+      type: uint8
+    - byte: 5
+      bit: 0-1
+      name: led1 status
+      type: uint
+      values:
+        0: off
+        1: on
+    - byte: 5
+      bit: 2-3
+      name: led2 status
+      type: uint
+      values:
+        0: off
+        1: on
+    - byte: 6
+      name: last command
+      type: uint8
+      values:
+        0: set brightness for led1 and led2
+        1: led1 off, led2 off
+        2: led1 on, led2 off
+        3: led1 off, led2 on
+        4: led1 on, led1 on
+        17: ramp brightness to new value
+        51: flash alternate
+
+1FED9:
+  name: GENERIC_INDICATOR_COMMAND
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+    - byte: 1
+      name: group
+      type: uint8
+      unit: bitmap
+    - byte: 2
+      name: brightness
+      type: uint8
+      unit: pct
+    - byte: 3
+      bit: 0-3
+      name: bank select
+      type: uint8
+    - byte: 4
+      name: duration
+      type: uint8
+      unit: sec
+    - byte: 6
+      name: function
+      type: uint8
+      values:
+        0: set brightness for led1 and led2
+        1: led1 off, led2 off
+        2: led1 on, led2 off
+        3: led1 off, led2 on
+        4: led1 on, led1 on
+        17: ramp brightness to new value
+        51: flash alternate
+
+1FEE0:
+  name: DC_MOTOR_CONTROL_STATUS
+
+1FEE1:
+  name: DC_MOTOR_CONTROL_COMMAND
+
+1FFB7:
+  name: TANK_STATUS
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+      values:
+         0: fresh water
+         1: black waste
+         2: gray waste
+         3: lpg
+         16: second fresh water
+         17: second black waste
+         18: second gray waste
+         19: second lpg
+    - byte: 1
+      name: relative level
+      type: uint8
+      comment: level = relative level / resolution
+    - byte: 2
+      name: resolution
+      type: uint8
+    - byte: 3-4
+      name: absolute level
+      type: uint16
+      unit: Liter
+    - byte: 5-6
+      name: tank size
+      type: uint16
+      unit: Liter
+
+1FFB6:
+  name: TANK_CALIBRATION_COMMAND
+
+1FFB5:
+  name: TANK_GEOMETRY_STATUS
+
+1FFB4:
+  name: TANK_GEOMETRY_COMMAND
+
+1FFB3:
+  name: WATER_PUMP_STATUS
+
+1FFB2:
+  name: WATER_PUMP_COMMAND
+
+1FFB1:
+  name: AUTOFILL_STATUS
+
+1FFB0:
+  name: AUTOFILL_COMMAND
+
+1FFAF:
+  name: WASTEDUMP_STATUS
+
+1FFAE:
+  name: WASTEDUMP_COMMAND
+
+1FFAD:
+  name: ATS_AC_STATUS_1
+  alias: Z0000
+  parameters:
+    - byte: 0
+      bit: 0-2
+      name: instance
+      type: uint3
+    - byte: 0
+      bit: 3
+      name: input output type
+      type: bit1
+      values:
+        0: input
+        1: output
+    - byte: 0
+      bit: 4-6
+      name: source
+      type: bit3
+      values:
+        000: primary
+        001: secondary
+        111: invalid
+    - byte: 0
+      bit: 7
+      name: leg
+      type: bit1
+      values:
+        0: 1
+        1: 2
+
+1FFAC:
+  name: ATS_AC_STATUS_2
+  alias: Z0001
+  parameters:
+    - byte: 0
+      bit: 0-2
+      name: instance
+      type: uint3
+    - byte: 0
+      bit: 3
+      name: input output type
+      type: bit1
+      values:
+        0: input
+        1: output
+    - byte: 0
+      bit: 4-6
+      name: source
+      type: bit3
+      values:
+        000: primary
+        001: secondary
+        111: invalid
+    - byte: 0
+      bit: 7
+      name: leg
+      type: bit1
+      values:
+        0: 1
+        1: 2
+
+1FFAB:
+  name: ATS_AC_STATUS_3
+  alias: Z0002
+  parameters:
+    - byte: 0
+      bit: 0-2
+      name: instance
+      type: uint3
+    - byte: 0
+      bit: 3
+      name: input output type
+      type: bit1
+      values:
+        0: input
+        1: output
+    - byte: 0
+      bit: 4-6
+      name: source
+      type: bit3
+      values:
+        000: primary
+        001: secondary
+        111: invalid
+    - byte: 0
+      bit: 7
+      name: leg
+      type: bit1
+      values:
+        0: 1
+        1: 2
+
+1FF85:
+  name: ATS_AC_STATUS_4
+  alias: Z0003
+  parameters:
+    - byte: 0
+      bit: 0-2
+      name: instance
+      type: uint3
+    - byte: 0
+      bit: 3
+      name: input output type
+      type: bit1
+      values:
+        0: input
+        1: output
+    - byte: 0
+      bit: 4-6
+      name: source
+      type: bit3
+      values:
+        000: primary
+        001: secondary
+        111: invalid
+    - byte: 0
+      bit: 7
+      name: leg
+      type: bit1
+      values:
+        0: 1
+        1: 2
+
+1FF84:
+  name: ATS_ACFAULT_CONFIGURATION_STATUS_1
+  alias: Z0004
+
+1FF83:
+  name: ATS_ACFAULT_CONFIGURATION_STATUS_2
+  alias: Z0005
+
+1FF82:
+  name: ATS_ACFAULT_CONFIGURATION_COMMAND_1
+  alias: Z0004
+
+1FF81:
+  name: ATS_ACFAULT_CONFIGURATION_COMMAND_2
+  alias: Z0005
+
+1FFAA:
+  name: ATS_STATUS
+
+1FFA9:
+  name: ATS_COMMAND
+
+1FFA5:
+  name: WEATHER_STATUS_1
+
+1FFA4:
+  name: WEATHER_STATUS_2
+
+1FFA3:
+  name: ALTIMETER_STATUS
+
+1FFA2:
+  name: ALTIMETER_COMMAND
+
+1FFA1:
+  name: WEATHER_CALIBRATE_COMMAND
+
+1FFA0:
+  name: COMPASS_BEARING_STATUS
+
+1FF9F:
+  name: COMPASS_CALIBRATE_COMMAND
+
+1FF80:
+  name: GENERATOR_DEMAND_STATUS
+
+1FEFF:
+  name: GENERATOR_DEMAND_COMMAND
+
+1FEFE:
+  name: AGS_CRITERION_STATUS
+
+1FED2:
+  name: AGS_CRITERION_STATUS_2
+
+1FEFD:
+  name: AGS_CRITERION_COMMAND
+
+1FED5:
+  name: AGS_DEMAND_CONFIGURATION_STATUS
+
+1FED4:
+  name: AGS_DEMAND_CONFIGURATION_COMMAND
+
+1FEFC:
+  name: FLOOR_HEAT_STATUS
+
+1FEFB:
+  name: FLOOR_HEAT_COMMAND
+
+1FEF1:
+  name: TIRE_RAW_STATUS
+
+1FEF0:
+  name: TIRE_STATUS
+
+1FEEF:
+  name: TIRE_SLOW_LEAK_ALARM
+
+1FEEE:
+  name: TIRE_TEMPERATURE_CONFIGURATION_STATUS
+
+1FEED:
+  name: TIRE_PRESSURE_CONFIGURATION_STATUS
+
+1FEEC:
+  name: TIRE_PRESSURE_CONFIGURATION_COMMAND
+
+1FEEB:
+  name: TIRE_TEMPERATURE_CONFIGURATION_COMMAND
+
+1FEEA:
+  name: TIRE_ID_STATUS
+
+1FEE9:
+  name: TIRE_ID_COMMAND
+
+1FEF3:
+  name: AWNING_STATUS
+
+1FEF2:
+  name: AWNING_COMMAND
+
+1FEDE:
+  name: WINDOW_SHADE_CONTROL_STATUS
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+    - byte: 1
+      name: group
+      type: uint8
+      unit: bitmap
+    - byte: 2
+      name: motor duty
+      type: uint8
+      unit: Pct
+    - byte: 3
+      bit: 0-1
+      name: lock status
+      type: bit2
+      values:
+        00: unlocked
+        01: locked
+        11: lock command not supported
+    - byte: 3
+      bit: 2-3
+      name: motor status
+      type: bit2
+      values:
+        00: inactive
+        01: active
+    - byte: 3
+      bit: 4-5
+      name: forward status
+      type: bit2
+      values:
+        00: inactive
+        01: active
+    - byte: 3
+      bit: 6-7
+      name: reverse status
+      type: bit2
+      values:
+        00: inactive
+        01: active
+    - byte: 4
+      name: duration
+      type: uint8
+    - byte: 5
+      name: last command
+      type: uint8
+      values:
+        4: stop
+        129: forward
+        65: reverse
+        133: toggle forward
+        69: toggle reverse
+        16: tilt
+        33: lock
+        34: unlock
+    - byte: 6
+      bit: 0-1
+      name: overcurrent status
+      type: bit2
+      values:
+        00: not in overcurrent
+        01: has drawn overcurrent
+        11: overcurrent status unavailable
+    - byte: 6
+      bit: 2-3
+      name: override status
+      type: bit2
+      values:
+        00: external override inactive
+        01: external override active
+        11: override status unavailable
+    - byte: 6
+      bit: 4-5
+      name: disable1 status
+      type: bit2
+      values:
+        00: inactive
+        01: active
+        11: not supported
+    - byte: 6
+      bit: 6-7
+      name: disable2 status
+      type: bit2
+      values:
+        00: inactive
+        01: active
+        11: not supported
+
+1FEDF:
+  name: WINDOW_SHADE_CONTROL_COMMAND
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+    - byte: 1
+      name: group
+      type: uint8
+      unit: bitmap
+    - byte: 2
+      name: motor duty
+      type: uint8
+      unit: Pct
+    - byte: 3
+      name: command
+      type: uint8
+      values:
+        4: stop
+        129: forward
+        65: reverse
+        133: toggle forward
+        69: toggle reverse
+        16: tilt
+        33: lock
+        34: unlock
+    - byte: 4
+      name: duration
+      type: uint8
+    - byte: 5
+      name: interlock
+      type: uint8
+      unit: bitmap
+
+1FEE5:
+  name: LOCK_STATUS
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+    - byte: 1
+      bit: 0-1
+      name: lock status
+      type: uint8
+      values:
+        0: unlocked
+        1: locked
+
+1FEE4:
+  name: LOCK_COMMAND
+  alias: 1FEE5
+
+1FEE3:
+  name: WINDOW_STATUS
+
+1FEE2:
+  name: WINDOW_COMMAND
+
+0FEF3:
+  name: GPS_POSITION
+
+1FED3:
+  name: GPS_STATUS
+
+1FED0:
+  name: DC_DISCONNECT_STATUS
+
+1FECF:
+  name: DC_DISCONNECT_COMMAND
+
+1FEB3:
+  name: SOLAR_CONTROLLER_STATUS
+
+1FEB2:
+  name: SOLAR_CONTROLLER_CONFIGURATION_STATUS
+
+1FEB1:
+  name: SOLAR_CONTROLLER_COMMAND
+
+1FEB0:
+  name: SOLAR_CONTROLLER_CONFIGURATION_COMMAND
+
+1FEAF:
+  name: SOLAR_EQUALIZATION_STATUS
+
+1FEAE:
+  name: SOLAR_EQUALIZATION_CONFIGURATION_STATUS
+
+1FEAD:
+  name: SOLAR_EQUALIZATION_CONFIGURATION_COMMAND
+
+1FED6:
+  name: MFG_SPECIFIC_CLAIM_REQUEST
+
+1FECA:
+  name: DM_RV
+  parameters:
+    - byte: 0
+      bit: 0-3
+      name: operating status
+      type: bit4
+    - byte: 0
+      bit: 4-5
+      name: yellow lamp status
+      type: bit2
+    - byte: 0
+      bit: 6-7
+      name: red lamp status
+      type: bit2
+    - byte: 1
+      name: dsa
+      type: uint8
+    - byte: 2
+      name: spn-msb
+      type: uint8
+    - byte: 3
+      name: spn-isb
+      type: uint8
+    - byte: 4
+      bit: 0-4
+      name: fmi
+      type: uint5
+    - byte: 4
+      bit: 5-7
+      name: spn-lsb
+      type: uint3
+    - byte: 5
+      bit: 0-6
+      name: occurrence count
+      type: uint7
+    - byte: 6
+      name: dsa extension
+      type: uint8
+    - byte: 7
+      bit: 0-3
+      name: bank select
+      type: uint4
+
+0FECA:
+  name: DM_1
+  alias: 1FECA
+  comment: off-spec DM_RV use by Spyder Controls.
+
+Z0000:
+  name: AC_STATUS_1
+  comment: Not an actual DGN, but these parameters are shared (aliased) by other DGNs
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+    - byte: 1-2
+      name: rms voltage
+      type: uint16
+      unit: V
+    - byte: 3-4
+      name: rms current
+      type: uint16
+      unit: A
+    - byte: 5-6
+      name: frequency
+      type: uint16
+      unit: Hz
+    - byte: 7
+      bit: 0-1
+      name: fault open ground
+      type: bit2
+      values:
+        00: no fault
+        01: open ground fault detected
+    - byte: 7
+      bit: 2-3
+      name: fault open neutral
+      type: bit2
+      values:
+        00: no fault
+        01: open neutral fault detected
+    - byte: 7
+      bit: 4-5
+      name: fault reverse polarity
+      type: bit2
+      values:
+        00: no fault
+        01: reverse polarity fault detected
+    - byte: 7
+      bit: 6-7
+      name: fault ground current
+      type: bit2
+      values:
+        00: no fault
+        01: ground current fault detected
+
+Z0001:
+  name: AC_STATUS_2
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+    - byte: 1-2
+      name: peak voltage
+      type: uint16
+      unit: V
+    - byte: 3-4
+      name: peak current
+      type: uint16
+      unit: A
+    - byte: 5-6
+      name: ground current
+      type: uint16
+      unit: A
+    - byte: 7
+      name: capacity
+      type: uint8
+      unit: A
+
+Z0002:
+  name: AC_STATUS_3
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+    - byte: 1
+      bit: 0-1
+      name: waveform
+      type: bit2
+      values:
+        00: sine wave
+        01: not true sine wave
+    - byte: 1
+      bit: 2-5
+      name: phase status
+      type: bit4
+      values:
+        0000: no complementary leg
+        0001: in phase
+        0010: 180 degrees out of phase
+        0011: phase relationship is variable
+        1110: error
+        1111: no data
+    - byte: 2-3
+      name: real power
+      type: uint16
+      unit: W
+    - byte: 4-5
+      name: reactive power
+      type: uint16
+      unit: VAr
+    - byte: 6
+      name: harmonic distortion
+      type: uint8
+      unit: Pct
+    - byte: 7
+      name: complementary leg
+      type: uint8
+
+Z0003:
+  name: AC_STATUS_4
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+    - byte: 1
+      name: voltage fault
+      type: uint8
+      values:
+        0: voltage ok
+        1: extremely low voltage
+        2: low voltage
+        3: high voltage
+        4: extremely high voltage
+        5: open line 1 detected
+        6: open line 2 detected
+    - byte: 2
+      bit: 0-1
+      name: fault surge protection
+      type: bit2
+      values:
+        00: no fault
+        01: surge fault detected
+    - byte: 2
+      bit: 2-3
+      name: fault high frequency
+      type: bit2
+      values:
+        00: no fault
+        01: frequency over high limit
+    - byte: 2
+      bit: 4-5
+      name: fault how frequency
+      type: bit2
+      values:
+        00: no fault
+        01: frequency below low limit
+    - byte: 2
+      bit: 6-7
+      name: bypass mode active
+      type: bit2
+      values:
+        00: normal mode
+        01: bypass mode
+    - byte: 3
+      bit: 0-3
+      name: qualification Status
+      type: uint4
+      values:
+        0: unqualified (no ac present)
+        1: unqualified (bad ac)
+        2: waiting to qualify
+        3: qualifying
+        4: qualified (good ac)
+
+Z0004:
+  name: AC_CONFIGURATION_STATUS_1
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+    - byte: 1
+      name: extreme low voltage level
+      type: uint8
+      unit: v
+    - byte: 2
+      name: low voltage level
+      type: uint8
+      unit: v
+    - byte: 3
+      name: high voltage level
+      type: uint8
+      unit: v
+    - byte: 4
+      name: extreme high voltage level
+      type: uint8
+      unit: v
+    - byte: 5
+      name: qualification time
+      type: uint8
+    - byte: 6
+      bit: 0-1
+      name: bypass mode
+      type: uint8
+      values:
+        0: normal mode
+        1: bypass mode
+
+Z0005:
+  name: AC_CONFIGURATION_STATUS_2
+  parameters:
+    - byte: 0
+      name: instance
+      type: uint8
+    - byte: 1
+      name: high frequency limit
+      type: uint8
+      unit: Hz
+    - byte: 2
+      name: low frequency limit
+      type: uint8
+      unit: Hz
+

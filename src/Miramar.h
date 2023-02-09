@@ -1,5 +1,7 @@
 #include "devices.h"
 
+// Device definitions for a 2020 Thor Miramar 32.2
+
 // index, type, name
 const SwitchDeviceRec switchList[] = {
     1, DimmableLamp, "Living Room",

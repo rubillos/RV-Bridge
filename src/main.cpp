@@ -13,17 +13,11 @@ constexpr uint8_t indicatorPinR = 2;
 constexpr uint8_t indicatorPinG = 15;
 constexpr uint8_t indicatorPinB = 4;
 
-constexpr uint8_t homespanControlPin = 21;
-constexpr uint8_t homespanControlGND = 19;
-
-constexpr uint16_t maxSwitches = 100;
-constexpr uint16_t maxFans = 100;
-constexpr uint16_t maxThermostats = 5;
-
 CAN_device_t CAN_cfg;               	// CAN Config
 constexpr int rx_queue_size = 10;       // Receive Queue size
 
-elapsedMillis packetSendTime = 1000;
+elapsedMillis packetSendTimer = 1000;
+elapsedMillis packetRecvTimer = 1000;
 
 //////////////////////////////////////////////
 
@@ -121,11 +115,11 @@ void sendDCDimmerCmd(uint8_t index, uint8_t brightness, uint8_t cmd, uint8_t dur
 	d[3] = cmd;
 	d[4] = duration;
 
-	packetSendTime = 0;
+	packetSendTimer = 0;
 	// ESP32Can.CANWriteFrame(&packet);
 
 	printf("Sending packet:\n");
-	processPacket(&packet,true);
+	processPacket(&packet, true);
 	printf("** Packet sent.\n");
 }
 
@@ -196,10 +190,12 @@ struct RVSwitch : SpanService {
 		if (index == _index && on != _on->getVal()) {
 			printf("Switch #%d: on = %d\n", index, on);
 			_on->setVal(on);
+			packetRecvTimer = 0;
 		}
 		if (index == _index && _brightness && on && level != _brightness->getVal()) {
 			printf("Switch #%d: level = %d\n", index, level);
 			_brightness->setVal(level);
+			packetRecvTimer = 0;
 		}
 	}
 };
@@ -242,12 +238,15 @@ struct RVRoofFan : Service::Fan {
 
 		if (index == _index) {
 			_fanPower = on;
+			packetRecvTimer = 0;
 		}
 		else if (index == _upIndex && on) {
 			_lidUp = true;
+			packetRecvTimer = 0;
 		}
 		else if (index == _downIndex && on) {
 			_lidUp = false;
+			packetRecvTimer = 0;
 		}
 
 		bool newState = _fanPower && _lidUp;
@@ -312,7 +311,7 @@ struct RVThermostat : Service::Thermostat {
 	RVThermostat(ThermostatDeviceRec *device) : Service::Thermostat() {
 		_ambientTemp = new Characteristic::CurrentTemperature(22);
 		_targetTemp = new Characteristic::TargetTemperature(22);
-		_targetTemp->setRange(10,32,0.5)->setVal(20);
+		_targetTemp->setRange(10, 32, 0.5)->setVal(20);
 		_curState = new Characteristic::CurrentHeatingCoolingState(0);
 		_targetState = new Characteristic::TargetHeatingCoolingState(0);
 		new Characteristic::TemperatureDisplayUnits(1);
@@ -350,11 +349,13 @@ struct RVThermostat : Service::Thermostat {
 			printf("Thermostat #%d: compressor = %d\n", index, on);
 			_compressorRunning = on;
 			changed = true;
+			packetRecvTimer = 0;
 		}
 		if (index == _furnaceIndex && on != _furnaceRunning) {
 			printf("Thermostat #%d: furnace = %d\n", index, on);
 			_furnaceRunning = on;
 			changed = true;
+			packetRecvTimer = 0;
 		}
 		if (changed) {
 			uint8_t newState;
@@ -378,19 +379,22 @@ struct RVThermostat : Service::Thermostat {
 		if (index == _index && fabs(tempC - _ambientTemp->getVal<double>()) > 0.2) {
 			printf("Set ambient temp #%d: %fºC\n", _index, tempC);
 			_ambientTemp->setVal(tempC);
+			packetRecvTimer = 0;
 		}
 	}
 
-	void setThermostatInfo(uint8_t index, ThermostatMode opMode, FanMode fanMode, uint8_t fanSpeed, double heatTemp, double coolTemp) {
+	void setInfo(uint8_t index, ThermostatMode opMode, FanMode fanMode, uint8_t fanSpeed, double heatTemp, double coolTemp) {
 		if (index == _index) {
 			uint8_t modeConvert[] { stateOff, stateCool, stateHeat, stateOff };
 			uint8_t mode = modeConvert[opMode];
 
 			if (mode != _curState->getVal()) {
 				_curState->setVal(mode);
+				packetRecvTimer = 0;
 			}
 			if (fabs(coolTemp - _targetTemp->getVal<double>()) > 0.2) {
 				_targetTemp->setVal(coolTemp);
+				packetRecvTimer = 0;
 			}
 			_fan->setModeSpeed(fanMode, fanSpeed);
 		}
@@ -399,13 +403,17 @@ struct RVThermostat : Service::Thermostat {
 
 //////////////////////////////////////////////
 
-RVSwitch* switches[maxSwitches];
-RVRoofFan* fans[maxFans];
-RVThermostat* thermostats[maxThermostats];
+constexpr uint16_t maxSwitches = sizeof(switchList) / sizeof(SwitchDeviceRec);
+constexpr uint16_t maxFans = sizeof(fanList) / sizeof(FanDeviceRec);
+constexpr uint16_t maxThermostats = sizeof(thermostatList) / sizeof(ThermostatDeviceRec);
 
 uint16_t switchCount = 0;
 uint16_t fanCount = 0;
 uint16_t thermostatCount = 0;
+
+RVSwitch* switches[maxSwitches];
+RVRoofFan* fans[maxFans];
+RVThermostat* thermostats[maxThermostats];
 
 void setSwitchLevel(uint8_t index, uint8_t level) {
 	for (auto i=0; i<switchCount; i++) {
@@ -427,7 +435,7 @@ void setAmbientTemp(uint8_t index, double tempC) {
 
 void setThermostatInfo(uint8_t index, ThermostatMode opMode, FanMode fanMode, uint8_t fanSpeed, double heatTemp, double coolTemp) {
 	for (auto i=0; i<thermostatCount; i++) {
-		thermostats[i]->setThermostatInfo(index, opMode, fanMode, fanSpeed, heatTemp, coolTemp);
+		thermostats[i]->setInfo(index, opMode, fanMode, fanSpeed, heatTemp, coolTemp);
 	}
 }
 
@@ -458,23 +466,20 @@ void createDevices() {
 
 //////////////////////////////////////////////
 
-const char* getValuePair(const char* buff, int8_t* val1, int8_t* val2) {
-	const char* equals = strchr(buff, '=');
-
+const char* getValuePair(const char* buff, int16_t* val1, int16_t* val2) {
 	*val1 = -1;
 	*val2 = -2;
 
-	if (equals) {
-		const char* buff2 = equals+1;
-		*val1 = atoi(buff);
-		*val2 = atoi(buff2);
+	const char* equals = strchr(buff, '=');
 
-		buff = strchr(buff2, ',');
+	if (equals) {
+		equals += 1;
+		*val1 = atoi(buff);
+		*val2 = atoi(equals);
+
+		buff = strchr(equals, ',');
 		if (buff) {
 			buff += 1;
-		}
-		else {
-			buff = NULL;
 		}
 	}
 	else {
@@ -485,12 +490,12 @@ const char* getValuePair(const char* buff, int8_t* val1, int8_t* val2) {
 }
 
 void cmdSet(const char *buff, uint8_t multiplier, const char* label) {
+	int16_t index;
+	int16_t val;
+
 	buff += 1;
 	
 	while (buff) {
-		int8_t index = 0;
-		int8_t val = 0;
-
 		buff = getValuePair(buff, &index, &val);
 
 		if (index!=-1 && val!=-1) {
@@ -509,11 +514,12 @@ void cmdSetState(const char *buff) {
 }
 
 void cmsSetTemp(const char *buff) {
+	int16_t index;
+	int16_t val;
+
 	buff += 1;
 	
 	while (buff) {
-		int8_t index;
-		int8_t val;
 		buff = getValuePair(buff, &index, &val);
 
 		if (index!=-1 && val!=-1) {
@@ -525,7 +531,7 @@ void cmsSetTemp(const char *buff) {
 }
 
 void addCommands() {
-	new SpanUserCommand('t',"<index>=<temperature>,... - set temperature of <index> to <val>", cmsSetTemp);
+	new SpanUserCommand('t',"<index>=<temperature>,... - set temperature of <index> to <val:ºF>", cmsSetTemp);
 	new SpanUserCommand('l',"<index>=<level>,... - set level of <index> to <val:0-200>", cmdSetLevel);
 	new SpanUserCommand('s',"<index>=<level>,... - set state of <index> to <val:0-1>", cmdSetState);
 }
@@ -541,7 +547,6 @@ PinSetup pinList[] = {
 	{ indicatorPinR, OUTPUT, HIGH },
 	{ indicatorPinG, OUTPUT, HIGH },
 	{ indicatorPinB, OUTPUT, HIGH },
-	{ homespanControlGND, OUTPUT, LOW },
 };
 
 void setup() {
@@ -568,8 +573,6 @@ void setup() {
 	ESP32Can.CANInit();
 
 	Serial.println("Init HomeSpan");
-	homeSpan.setStatusPin(indicatorPinB);
-	homeSpan.setControlPin(homespanControlPin);
 	homeSpan.setWifiCredentials(ssid, sspwd);
 	homeSpan.setSketchVersion(versionString);
 	homeSpan.begin(Category::Bridges, "RV-Bridge", DEFAULT_HOST_NAME, "RV-Bridge-ESP32");
@@ -591,9 +594,9 @@ void processPacket(CAN_frame_t *packet, bool printPacket) {
 		printf("RTR from 0x%08X, DLC %d\r\n", packet->MsgID,  packet->FIR.B.DLC);
 	}
 	else {
-		uint8_t priority = getMsgBits(packet->MsgID, 28, 3);
 		uint32_t dgn = getMsgBits(packet->MsgID, 24, 17);
 		uint8_t sourceAddr = getMsgBits(packet->MsgID, 7, 8);
+		uint8_t priority = getMsgBits(packet->MsgID, 28, 3);
 
 		uint8_t* d = packet->data.u8;
 
@@ -731,21 +734,21 @@ void loop() {
 	static elapsedMillis blinkTime;
 
 	digitalWrite(indicatorPinR, (blinkTime % 2000) > 20);
-	digitalWrite(indicatorPinG, packetSendTime > 50);
+	digitalWrite(indicatorPinG, packetSendTimer > 20);
+	digitalWrite(indicatorPinB, packetRecvTimer > 20);
 
 	homeSpan.poll();
 
 	CAN_frame_t packet;
 
-	// Receive next CAN packet from queue
-	if (xQueueReceive(CAN_cfg.rx_queue, &packet, 0 /*3 * portTICK_PERIOD_MS */) == pdTRUE) {
+	if (xQueueReceive(CAN_cfg.rx_queue, &packet, 0) == pdTRUE) {
 		processPacket(&packet);
 	}
 
-	static elapsedMillis toggleTime;
+	// static elapsedMillis toggleTime;
 
-	if (false && toggleTime > 3000) {
-		toggleTime = 0;
+	// if (false && toggleTime > 3000) {
+	// 	toggleTime = 0;
 
 		// pri=6, dgn=0x1FEDB, src=9F
 		// DC_DIMMER_COMMAND_2 (1FEDB):
@@ -797,4 +800,4 @@ void loop() {
 //     tx_packet.data.u8[7] = 0x07;
 //     ESP32Can.CANWriteFrame(&tx_packet);
 //   }
-}
+// }

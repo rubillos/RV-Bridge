@@ -9,6 +9,8 @@
 
 //////////////////////////////////////////////
 
+constexpr const char* versionString = "v0.1";
+
 constexpr uint8_t indicatorPinR = 2;
 constexpr uint8_t indicatorPinG = 15;
 constexpr uint8_t indicatorPinB = 4;

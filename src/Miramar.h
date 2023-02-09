@@ -1,8 +1,5 @@
 #include "devices.h"
 
-// 2020 Thor Miramar 32.2
-// Firefly Integrations Gas V6
-
 // index, type, name
 const SwitchDeviceRec switchList[] = {
     1, DimmableLamp, "Living Room",
@@ -28,5 +25,5 @@ const FanDeviceRec fanList[] = {
 // index, compressorIndex, furnaceIndex, name
 const ThermostatDeviceRec thermostatList[] = {
     1, 25, 33, "Front",
-    2, 29, -1, "Back"
+    2, 29, 0, "Back"
 };

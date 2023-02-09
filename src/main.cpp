@@ -9,21 +9,39 @@
 
 //////////////////////////////////////////////
 
-#define INDICATOR_PIN_R 2
-#define INDICATOR_PIN_G 15
-#define INDICATOR_PIN_B 4
+constexpr uint8_t indicatorPinR = 2;
+constexpr uint8_t indicatorPinG = 15;
+constexpr uint8_t indicatorPinB = 4;
 
-#define HOMESPAN_CONTROL_PIN 21
-#define HOMESPAN_CONTROL_GND 19
+constexpr uint8_t homespanControlPin = 21;
+constexpr uint8_t homespanControlGND = 19;
 
 constexpr uint16_t maxSwitches = 100;
 constexpr uint16_t maxFans = 100;
 constexpr uint16_t maxThermostats = 5;
 
-CAN_device_t CAN_cfg;               // CAN Config
-unsigned long previousMillis = 0;   // will store last time a CAN Message was send
-const int interval = 1000;          // interval at which send CAN Messages (milliseconds)
-const int rx_queue_size = 10;       // Receive Queue size
+CAN_device_t CAN_cfg;               	// CAN Config
+constexpr int rx_queue_size = 10;       // Receive Queue size
+
+elapsedMillis packetSendTime = 1000;
+
+//////////////////////////////////////////////
+
+void processPacket(CAN_frame_t *packet, bool printPacket=true);
+
+//////////////////////////////////////////////
+
+constexpr uint32_t DATE_TIME_STATUS = 0x1FFFF;
+constexpr uint32_t DC_DIMMER_COMMAND_2 = 0x1FEDB;
+constexpr uint32_t DC_DIMMER_STATUS_3 = 0x1FEDA;
+constexpr uint32_t THERMOSTAT_AMBIENT_STATUS = 0x1FF9C;
+constexpr uint32_t THERMOSTAT_STATUS_1 = 0x1FFE2;
+constexpr uint32_t AIR_CONDITIONER_STATUS = 0x1FFE0; // 1FFE1
+constexpr uint32_t GENERIC_INDICATOR_COMMAND = 0x1FED9;
+constexpr uint32_t GENERIC_CONFIGURATION_STATUS = 0x1FED8;
+constexpr uint32_t DC_SOURCE_STATUS_1 = 0x1FFFD;
+constexpr uint32_t TANK_STATUS = 0x1FFB7;
+constexpr uint32_t GENERATOR_STATUS_1 = 0x1FFDC;
 
 //////////////////////////////////////////////
 
@@ -63,13 +81,70 @@ typedef enum {
 	FanModeOn
 } FanMode;
 
-void sendOnOff(uint8_t index, bool on) {
-	printf("sendOnOff: #%d to %d\n", index, on);
+//////////////////////////////////////////////
+
+uint32_t getMsgBits(uint32_t msg, int8_t startBit, int8_t numBits) {
+	int8_t shift = startBit - numBits + 1;
+	uint32_t mask = 0xFFFFFFFF >> (32 - numBits);
+
+	return (msg >> shift) & mask;
 }
 
-void sendLampLevel(uint8_t index, uint8_t level) {
-	printf("sendLampLevel: #%d to %d\n", index, level);
+uint32_t makeMsg(uint32_t dgn, uint8_t sourceID=0, uint8_t priority=6) {
+	if (sourceID == 0) {
+		sourceID = sourceAddress;
+	}
+
+	return (priority<<26) | (dgn << 8) | sourceID;	
 }
+
+//////////////////////////////////////////////
+
+void initPacket(CAN_frame_t* packet) {
+	packet->FIR.B.DLC = 8;
+	packet->FIR.B.RTR = CAN_no_RTR;
+	packet->FIR.B.FF = CAN_frame_ext;
+	for (auto i=0; i<8; i++) {
+		packet->data.u8[i] = 0xFF;
+	}
+}
+
+void sendDCDimmerCmd(uint8_t index, uint8_t brightness, uint8_t cmd, uint8_t duration=0xFF) {
+	CAN_frame_t packet;
+	initPacket(&packet);
+	uint8_t* d = packet.data.u8;
+	
+	packet.MsgID = makeMsg(DC_DIMMER_COMMAND_2);
+
+	d[0] = index;
+	d[2] = brightness;
+	d[3] = cmd;
+	d[4] = duration;
+
+	packetSendTime = 0;
+	// ESP32Can.CANWriteFrame(&packet);
+
+	printf("Sending packet:\n");
+	processPacket(&packet,true);
+	printf("** Packet sent.\n");
+}
+
+void sendOnOff(uint8_t index, bool on, uint8_t brightness=200) {
+	printf("sendOnOff: #%d to %d\n", index, on);
+	sendDCDimmerCmd(index, brightness, (on) ? DCDimmerCmdOnDuration : DCDimmerCmdOff);
+}
+
+void sendLampLevel(uint8_t index, uint8_t brightness) {
+	if (brightness == 0) {
+		sendOnOff(index, false);
+	}
+	else {
+		printf("sendLampLevel: #%d to %d\n", index, brightness);
+		sendDCDimmerCmd(index, brightness, DCDimmerCmdSetBrightness, 0);
+	}
+}
+
+//////////////////////////////////////////////
 
 const char* switchTypes[3] = { "43", "43", "49" };
 const char* switchHapNames[3] = { "LightBulb", "LightBulb", "Switch" };
@@ -103,24 +178,27 @@ struct RVSwitch : SpanService {
 	}
 	
 	boolean update() {
-		if (_on->updated()) {
-			sendOnOff(_index, _on->getNewVal());
-		}
-		if (_brightness && _brightness->updated()) {
-			sendLampLevel(_index, _brightness->getNewVal());
+		if (_on->updated() || (_brightness && _brightness->updated())) {
+			if (_brightness) {
+				sendLampLevel(_index, _on->getNewVal() * _brightness->getNewVal() * 2);
+			}
+			else {
+				sendOnOff(_index, _on->getNewVal());
+			}
 		}
 		return(true);  
 	}
 	
-	void setOnOff(uint8_t index, bool on) {
+	void setLevel(uint8_t index, uint8_t level) {
+		bool on = level > 0;
+		level /= 2;
+
 		if (index == _index && on != _on->getVal()) {
-			printf("Switch #%d: setOnOff = %d\n", index, on);
+			printf("Switch #%d: on = %d\n", index, on);
 			_on->setVal(on);
 		}
-	}
-	void setLevel(uint8_t index, uint8_t level) {
-		if (index == _index && level != _brightness->getVal()) {
-			printf("Switch #%d: setOnOff = %d\n", index, level);
+		if (index == _index && _brightness && on && level != _brightness->getVal()) {
+			printf("Switch #%d: level = %d\n", index, level);
 			_brightness->setVal(level);
 		}
 	}
@@ -159,7 +237,9 @@ struct RVRoofFan : Service::Fan {
 		return(true);  
 	}
 	
-	void setOnOff(uint8_t index, bool on) {
+	void setLevel(uint8_t index, uint8_t level) {
+		bool on = level > 0;
+
 		if (index == _index) {
 			_fanPower = on;
 		}
@@ -262,8 +342,10 @@ struct RVThermostat : Service::Thermostat {
 		return(true);  
 	}
 
-	void setOnOff(uint8_t index, bool on) {
+	void setLevel(uint8_t index, uint8_t level) {
+		bool on = level > 0;
 		bool changed = false;
+
 		if (index == _compressorIndex && on != _compressorRunning) {
 			printf("Thermostat #%d: compressor = %d\n", index, on);
 			_compressorRunning = on;
@@ -276,6 +358,7 @@ struct RVThermostat : Service::Thermostat {
 		}
 		if (changed) {
 			uint8_t newState;
+
 			if (_furnaceRunning) {
 				newState = stateHeat;
 			}
@@ -300,7 +383,7 @@ struct RVThermostat : Service::Thermostat {
 
 	void setThermostatInfo(uint8_t index, ThermostatMode opMode, FanMode fanMode, uint8_t fanSpeed, double heatTemp, double coolTemp) {
 		if (index == _index) {
-			uint8_t modeConvert[] = { stateOff, stateCool, stateHeat, stateOff };
+			uint8_t modeConvert[] { stateOff, stateCool, stateHeat, stateOff };
 			uint8_t mode = modeConvert[opMode];
 
 			if (mode != _curState->getVal()) {
@@ -324,32 +407,26 @@ uint16_t switchCount = 0;
 uint16_t fanCount = 0;
 uint16_t thermostatCount = 0;
 
-void setSwitchState(uint8_t index, bool on) {
-	for (uint16_t i=0; i<switchCount; i++) {
-		switches[i]->setOnOff(index, on);
-	}
-	for (uint16_t i=0; i<fanCount; i++) {
-		fans[i]->setOnOff(index, on);
-	}
-	for (uint16_t i=0; i<thermostatCount; i++) {
-		thermostats[i]->setOnOff(index, on);
-	}
-}
-
-void setLampBrightness(uint8_t index, int8_t level) {
-	for (uint16_t i=0; i<switchCount; i++) {
+void setSwitchLevel(uint8_t index, uint8_t level) {
+	for (auto i=0; i<switchCount; i++) {
 		switches[i]->setLevel(index, level);
+	}
+	for (auto i=0; i<fanCount; i++) {
+		fans[i]->setLevel(index, level);
+	}
+	for (auto i=0; i<thermostatCount; i++) {
+		thermostats[i]->setLevel(index, level);
 	}
 }
 
 void setAmbientTemp(uint8_t index, double tempC) {
-	for (uint16_t i=0; i<thermostatCount; i++) {
+	for (auto i=0; i<thermostatCount; i++) {
 		thermostats[i]->setAmbientTemp(index, tempC);
 	}
 }
 
 void setThermostatInfo(uint8_t index, ThermostatMode opMode, FanMode fanMode, uint8_t fanSpeed, double heatTemp, double coolTemp) {
-	for (uint16_t i=0; i<thermostatCount; i++) {
+	for (auto i=0; i<thermostatCount; i++) {
 		thermostats[i]->setThermostatInfo(index, opMode, fanMode, fanSpeed, heatTemp, coolTemp);
 	}
 }
@@ -407,7 +484,7 @@ const char* getValuePair(const char* buff, int8_t* val1, int8_t* val2) {
 	return buff;
 }
 
-void cmsSetState(const char *buff) {
+void cmdSet(const char *buff, uint8_t multiplier, const char* label) {
 	buff += 1;
 	
 	while (buff) {
@@ -417,25 +494,18 @@ void cmsSetState(const char *buff) {
 		buff = getValuePair(buff, &index, &val);
 
 		if (index!=-1 && val!=-1) {
-			printf("cmdSetState: index=%d, val=%d\n", index, val);
-			setSwitchState(index, val);
+			printf("%s: index=%d, val=%d\n", label, index, val);
+			setSwitchLevel(index, val*multiplier);
 		}
 	}
 }
 
-void cmsSetBrightness(const char *buff) {
-	buff += 1;
-	
-	while (buff) {
-		int8_t index;
-		int8_t val;
-		buff = getValuePair(buff, &index, &val);
+void cmdSetLevel(const char *buff) {
+	cmdSet(buff, 1, "cmdSetLevel");
+}
 
-		if (index!=-1 && val!=-1) {
-			printf("cmsSetBrightness: index=%d, val=%d\n", index, val);
-			setLampBrightness(index, val);
-		}
-	}
+void cmdSetState(const char *buff) {
+	cmdSet(buff, 200, "cmdSetState");
 }
 
 void cmsSetTemp(const char *buff) {
@@ -456,8 +526,8 @@ void cmsSetTemp(const char *buff) {
 
 void addCommands() {
 	new SpanUserCommand('t',"<index>=<temperature>,... - set temperature of <index> to <val>", cmsSetTemp);
-	new SpanUserCommand('b',"<index>=<brightness>,... - set brightness of <index> to <val>", cmsSetBrightness);
-	new SpanUserCommand('s',"<index>=<val>,... - set state of <index> to <val>", cmsSetState);
+	new SpanUserCommand('l',"<index>=<level>,... - set level of <index> to <val:0-200>", cmdSetLevel);
+	new SpanUserCommand('s',"<index>=<level>,... - set state of <index> to <val:0-1>", cmdSetState);
 }
 
 //////////////////////////////////////////////
@@ -468,10 +538,10 @@ typedef struct {
 } PinSetup;
 
 PinSetup pinList[] = {
-	{ INDICATOR_PIN_R, OUTPUT, HIGH },
-	{ INDICATOR_PIN_G, OUTPUT, HIGH },
-	{ INDICATOR_PIN_B, OUTPUT, HIGH },
-	{ HOMESPAN_CONTROL_GND, OUTPUT, LOW },
+	{ indicatorPinR, OUTPUT, HIGH },
+	{ indicatorPinG, OUTPUT, HIGH },
+	{ indicatorPinB, OUTPUT, HIGH },
+	{ homespanControlGND, OUTPUT, LOW },
 };
 
 void setup() {
@@ -480,10 +550,10 @@ void setup() {
 		digitalWrite(pin.pinNumber, pin.state);
 	}
 
-	for (int i=0; i<20; i++) {
-		digitalWrite(INDICATOR_PIN_R, LOW);
+	for (auto i=0; i<20; i++) {
+		digitalWrite(indicatorPinR, LOW);
 		delay(100);
-		digitalWrite(INDICATOR_PIN_R, HIGH);
+		digitalWrite(indicatorPinR, HIGH);
 		delay(100);
 	}
 
@@ -498,8 +568,8 @@ void setup() {
 	ESP32Can.CANInit();
 
 	Serial.println("Init HomeSpan");
-	homeSpan.setStatusPin(INDICATOR_PIN_B);
-	homeSpan.setControlPin(HOMESPAN_CONTROL_PIN);
+	homeSpan.setStatusPin(indicatorPinB);
+	homeSpan.setControlPin(homespanControlPin);
 	homeSpan.setWifiCredentials(ssid, sspwd);
 	homeSpan.setSketchVersion(versionString);
 	homeSpan.begin(Category::Bridges, "RV-Bridge", DEFAULT_HOST_NAME, "RV-Bridge-ESP32");
@@ -512,39 +582,22 @@ void setup() {
 
 //////////////////////////////////////////////
 
-uint32_t getMsgBits(uint32_t msg, int8_t startBit, int8_t numBits) {
-	int8_t shift = startBit - numBits + 1;
-	uint32_t mask = 0xFFFFFFFF >> (32 - numBits);
-
-	return (msg >> shift) & mask;
-}
-
-uint32_t makeMsg(uint32_t dgn, uint8_t sourceID=0, uint8_t priority=6) {
-	if (sourceID == 0) {
-		sourceID = sourceAddress;
-	}
-
-	return (priority<<26) | (dgn << 8) | sourceID;	
-}
-
-//////////////////////////////////////////////
-
 double convToTempC(uint16_t value) {
 	return -273.0 + value * 0.03125;
 }
 
-void processFrame(CAN_frame_t *frame, bool force=true) {
-	if (frame->FIR.B.RTR == CAN_RTR) {
-		printf(" RTR from 0x%08X, DLC %d\r\n", frame->MsgID,  frame->FIR.B.DLC);
+void processPacket(CAN_frame_t *packet, bool printPacket) {
+	if (packet->FIR.B.RTR == CAN_RTR) {
+		printf("RTR from 0x%08X, DLC %d\r\n", packet->MsgID,  packet->FIR.B.DLC);
 	}
 	else {
-		uint8_t priority = getMsgBits(frame->MsgID, 28, 3);
-		uint32_t dgn = getMsgBits(frame->MsgID, 24, 17);
-		uint8_t sourceAddr = getMsgBits(frame->MsgID, 7, 8);
+		uint8_t priority = getMsgBits(packet->MsgID, 28, 3);
+		uint32_t dgn = getMsgBits(packet->MsgID, 24, 17);
+		uint8_t sourceAddr = getMsgBits(packet->MsgID, 7, 8);
 
-		uint8_t* d = frame->data.u8;
+		uint8_t* d = packet->data.u8;
 
-		if (dgn == 0x1FFFF) { // DATE_TIME_STATUS
+		if (dgn == DATE_TIME_STATUS) {
 			// uint8_t year = d[0];
 			// uint8_t month = d[1];
 			// uint8_t day = d[2];
@@ -555,7 +608,7 @@ void processFrame(CAN_frame_t *frame, bool force=true) {
 			// uint8_t timeZone = d[7];
 
 		}
-		else if (dgn == 0x1FEDA) { // DC_DIMMER_STATUS_3
+		else if (dgn == DC_DIMMER_STATUS_3) {
 			uint8_t instance = d[0];
 			uint8_t group = d[1];
 			uint8_t brightness = d[2];
@@ -565,8 +618,9 @@ void processFrame(CAN_frame_t *frame, bool force=true) {
 			uint8_t status = (d[6] >> 2) & 3;
 
 			printf("DC_DIMMER_STATUS_3: inst=%d, grp=0X%02X, bright=%d, enable=%d, dur=%d, last cmd=%d, status=0X%02X\n", instance, group, brightness, enable, delayDuration, lastCmd, status);				
+			setSwitchLevel(instance, brightness);
 		}
-		else if (dgn == 0x1FEDB) { // DC_DIMMER_COMMAND_2
+		else if (dgn == DC_DIMMER_COMMAND_2) {
 			uint8_t instance = d[0];
 			uint8_t group = d[1];
 			uint8_t brightness = d[2];
@@ -574,15 +628,16 @@ void processFrame(CAN_frame_t *frame, bool force=true) {
 			uint8_t delayDuration = d[4];
 
 			printf("DC_DIMMER_COMMAND_2: inst=%d, grp=0X%02X, bright=%d, cmd=0X%02X, dur=%d\n", instance, group, brightness, cmd, delayDuration);				
-			// force = true;
+			// printPacket = true;
 		}
-		else if (dgn == 0x1FF9C) { // THERMOSTAT_AMBIENT_STATUS
+		else if (dgn == THERMOSTAT_AMBIENT_STATUS) {
 			uint8_t instance = d[0];
 			double tempC = convToTempC(d[2]<<8 | d[1]);
 			
+			printf("THERMOSTAT_AMBIENT_STATUS: temp=%fºC\n", tempC);
 			setAmbientTemp(instance, tempC);
 		}
-		else if (dgn == 0x1FFE2) { // THERMOSTAT_STATUS_1
+		else if (dgn == THERMOSTAT_STATUS_1) {
 			uint8_t instance = d[0];
 			ThermostatMode opMode = (ThermostatMode)(d[1] & 0x0F);
 			FanMode fanMode = (FanMode)((d[1]>>4) & 0x03);
@@ -590,9 +645,10 @@ void processFrame(CAN_frame_t *frame, bool force=true) {
 			double heatTemp = convToTempC(d[4]<<8 | d[3]);
 			double coolTemp = convToTempC(d[6]<<8 | d[5]);
 			
+			printf("THERMOSTAT_STATUS_1: inst=%d, opMode=%d, fanMode=%d, fanSpeed=%d, heatTemp=%fºC, coolTemp=%fºC\n", instance, opMode, fanMode, fanSpeed, heatTemp, coolTemp);
 			setThermostatInfo(instance, opMode, fanMode, fanSpeed, heatTemp, coolTemp);
 		}
-		else if (dgn == 0x1FFE0) { // AIR_CONDITIONER_STATUS - 1FFE1
+		else if (dgn == AIR_CONDITIONER_STATUS) {
 			uint8_t instance = d[0];
 			ACMode opMode = (ACMode)d[1];
 			uint8_t maxFanSpeed = d[2];
@@ -603,19 +659,19 @@ void processFrame(CAN_frame_t *frame, bool force=true) {
 			uint8_t deadBand2 = d[7];
 			
 		}
-		else if (dgn == 0x1FED9) { // GENERIC_INDICATOR_COMMAND
+		else if (dgn == GENERIC_INDICATOR_COMMAND) {
 			// printf("GENERIC_INDICATOR_COMMAND: inst=%d, grp=0X%02X, bright=%d, bank=%d, dur=%d, func=%d\n", d[0], d[1], d[2], d[3], d[4], d[6]);
 		}
-		else if (dgn == 0x1FED8) { // GENERIC_CONFIGURATION_STATUS
+		else if (dgn == GENERIC_CONFIGURATION_STATUS) {
 			
 		}
-		else if (dgn == 0x1FFFD) { // DC_SOURCE_STATUS_1
+		else if (dgn == DC_SOURCE_STATUS_1) {
 			
 		}
-		else if (dgn == 0x1FFB7) { // TANK_STATUS
+		else if (dgn == TANK_STATUS) {
 			
 		}
-		else if (dgn == 0x1FFDC) { // GENERATOR_STATUS_1
+		else if (dgn == GENERATOR_STATUS_1) {
 			
 		}
 		else if (dgn == 0x0FECA) { // DM_1 - 1FECA - DM_RV
@@ -646,23 +702,23 @@ void processFrame(CAN_frame_t *frame, bool force=true) {
 			
 		}
 		else {
-			force = true;
+			printPacket = true;
 		}
 
-		if (force) {
-			if (frame->FIR.B.FF == CAN_frame_std) {
-				printf("Standard frame");
+		if (printPacket) {
+			if (packet->FIR.B.FF == CAN_frame_std) {
+				printf("Std - ");
 			}
 			else {
-				printf("Extended frame");
+				printf("Ext - ");
 			}
 
-			printf(" pri=%d, dgn=0x%05X, src=%02X, Data ", priority, dgn, sourceAddr);
+			printf("dgn=%05X, src=%02X, pri=%d, Data: ", dgn, sourceAddr, priority);
 
-			// printf(" from 0x%08X, DLC %d, Data ", frame->MsgID,  frame->FIR.B.DLC);
+			// printf(" from 0x%08X, DLC %d, Data ", packet->MsgID,  packet->FIR.B.DLC);
 
-			for (int i = 0; i < frame->FIR.B.DLC; i++) {
-				printf("0x%02X ", frame->data.u8[i]);
+			for (auto i = 0; i < packet->FIR.B.DLC; i++) {
+				printf("%02X ", packet->data.u8[i]);
 			}
 			printf("\n");
 		}
@@ -674,17 +730,16 @@ void processFrame(CAN_frame_t *frame, bool force=true) {
 void loop() {
 	static elapsedMillis blinkTime;
 
-	digitalWrite(INDICATOR_PIN_R, (blinkTime % 2000) > 20);
+	digitalWrite(indicatorPinR, (blinkTime % 2000) > 20);
+	digitalWrite(indicatorPinG, packetSendTime > 50);
 
 	homeSpan.poll();
 
-	CAN_frame_t rx_frame;
+	CAN_frame_t packet;
 
-	unsigned long currentMillis = millis();
-
-	// Receive next CAN frame from queue
-	if (xQueueReceive(CAN_cfg.rx_queue, &rx_frame, 0 /*3 * portTICK_PERIOD_MS */) == pdTRUE) {
-		processFrame(&rx_frame);
+	// Receive next CAN packet from queue
+	if (xQueueReceive(CAN_cfg.rx_queue, &packet, 0 /*3 * portTICK_PERIOD_MS */) == pdTRUE) {
+		processPacket(&packet);
 	}
 
 	static elapsedMillis toggleTime;
@@ -697,49 +752,49 @@ void loop() {
 		//    inst=17, grp=0XFF, bright=200, cmd=0X05, dur=255, lock=0X00
 
 		// DC_DIMMER_COMMAND_2: inst=17, grp=0XFF, bright=200, cmd=0X05, dur=255, lock=0X00
-		// Extended frame pri=6, dgn=0x1FEDB, src=FC, Data 0x11 0xFF 0xC8 0x05 0xFF 0x00 0xFF 0xFF 
+		// Extended packet pri=6, dgn=0x1FEDB, src=FC, Data 0x11 0xFF 0xC8 0x05 0xFF 0x00 0xFF 0xFF 
 
 		// Sending toggle
 		// DC_DIMMER_COMMAND_2: inst=17, grp=0XFF, bright=200, cmd=0X05, dur=255, lock=0X00
 		// Standard frame pri=6, dgn=0x1FEDB, src=81, Data 0x11 0xFF 0xC8 0x05 0xFF 0x00 0x00 0x00 
 
-		CAN_frame_t tx_frame;
-		uint8_t* d = tx_frame.data.u8;
+		// CAN_frame_t tx_packet;
+		// uint8_t* d = tx_packet.data.u8;
 
-		tx_frame.FIR.B.FF = CAN_frame_ext;
-		tx_frame.MsgID = makeMsg(0x1FEDB);
+		// tx_packet.FIR.B.FF = CAN_frame_ext;
+		// tx_packet.MsgID = makeMsg(0x1FEDB);
 
-		tx_frame.FIR.B.DLC = 8;
-		d[0] = 17;
-		d[1] = 0xFF;
-		d[2] = 200;
-		d[3] = 5; // toggle
-		d[4] = 255;
-		d[5] = 0;
+		// tx_packet.FIR.B.DLC = 8;
+		// d[0] = 17;
+		// d[1] = 0xFF;
+		// d[2] = 200;
+		// d[3] = 5; // toggle
+		// d[4] = 255;
+		// d[5] = 0;
 
-		d[6] = 0xFF;
-		d[7] = 0xFF;
+		// d[6] = 0xFF;
+		// d[7] = 0xFF;
 
-		printf("Sending toggle\n");
-		ESP32Can.CANWriteFrame(&tx_frame);
+		// printf("Sending toggle\n");
+		// ESP32Can.CANWriteFrame(&tx_packet);
 
-		processFrame(&tx_frame, true);
+		// processPacket(&tx_packet, true);
 	}
 	// Send CAN Message
 //   if (currentMillis - previousMillis >= interval) {
 //     previousMillis = currentMillis;
-//     CAN_frame_t tx_frame;
-//     tx_frame.FIR.B.FF = CAN_frame_std;
-//     tx_frame.MsgID = 0x001;
-//     tx_frame.FIR.B.DLC = 8;
-//     tx_frame.data.u8[0] = 0x00;
-//     tx_frame.data.u8[1] = 0x01;
-//     tx_frame.data.u8[2] = 0x02;
-//     tx_frame.data.u8[3] = 0x03;
-//     tx_frame.data.u8[4] = 0x04;
-//     tx_frame.data.u8[5] = 0x05;
-//     tx_frame.data.u8[6] = 0x06;
-//     tx_frame.data.u8[7] = 0x07;
-//     ESP32Can.CANWriteFrame(&tx_frame);
+//     CAN_frame_t tx_packet;
+//     tx_packet.FIR.B.FF = CAN_frame_std;
+//     tx_packet.MsgID = 0x001;
+//     tx_packet.FIR.B.DLC = 8;
+//     tx_packet.data.u8[0] = 0x00;
+//     tx_packet.data.u8[1] = 0x01;
+//     tx_packet.data.u8[2] = 0x02;
+//     tx_packet.data.u8[3] = 0x03;
+//     tx_packet.data.u8[4] = 0x04;
+//     tx_packet.data.u8[5] = 0x05;
+//     tx_packet.data.u8[6] = 0x06;
+//     tx_packet.data.u8[7] = 0x07;
+//     ESP32Can.CANWriteFrame(&tx_packet);
 //   }
 }

@@ -32,6 +32,20 @@ Uses an ESP32 with a CAN-Bus interface, either separate components, or more easi
 
 To-Do
 
+## 3D Printing
+
+- STL Files in the docs folder:
+    * ***RV-Bridge_Box_Bottom.stl***
+    * ***RV-Bridge_Box_Top.stl***
+- Slicer
+    * Prusa Slicer 2.5.0
+- Filament
+    * PETG (handles heat better than PLA)
+- Settings
+    * Layer height 0.3mm
+    * Set extrusion width to 0.55 (eliminates tiny infill strips in walls)
+    * Perimeter transitioning threshold angle to 20 (keeps the lettering connected)
+
 ## References
 
 To-Do

@@ -6,6 +6,16 @@
 * Connects to RV-C network in many recent model RVs
 * Connects lights, fans, and thermostats to HomeKit
 
+## Current Project State
+
+* Homespan pairing works, devices show up in Home app.
+* Can-Bus receiving works.
+
+To-Do:
+
+* Routing Can-Bus messages to HomeKit devices
+* Verify sending of correct RV-C messages
+
 ## Hardware
 
 Uses an ESP32 with a CAN-Bus interface, either separate components, or more easily:

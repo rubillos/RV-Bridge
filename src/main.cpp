@@ -15,11 +15,18 @@ constexpr uint8_t indicatorPinR = 2;
 constexpr uint8_t indicatorPinG = 15;
 constexpr uint8_t indicatorPinB = 4;
 
+constexpr gpio_num_t canTxPin = GPIO_NUM_25;
+constexpr gpio_num_t canRxPin = GPIO_NUM_26;
+
 CAN_device_t CAN_cfg;               	// CAN Config
 constexpr int rx_queue_size = 10;       // Receive Queue size
 
 elapsedMillis packetSendTimer = 1000;
 elapsedMillis packetRecvTimer = 1000;
+
+constexpr uint32_t packetBlinkTime = 30;
+constexpr uint32_t heatbeatRate = 2000;
+constexpr uint32_t heartbeatBlinkTime = 20;
 
 //////////////////////////////////////////////
 
@@ -260,32 +267,27 @@ struct RVRoofFan : Service::Fan {
 	}
 };
 
-struct RVHVACFan : Service::Fan {
-	SpanCharacteristic *_active;
-	SpanCharacteristic *_speed;
+using namespace std;
+
+struct RVHVACFan : Service::Switch {
+	SpanCharacteristic *_on;
+	function<bool()> _func;
 
 	uint8_t _index;
 
-	RVHVACFan(uint8_t index) : Service::Fan() {
-		_active = new Characteristic::Active();
-		_speed = new Characteristic::RotationSpeed();
-		_speed->setRange(0, 100, 50);
+	RVHVACFan(uint8_t index, function<bool()> func) : Service::Switch() {
+		_on = new Characteristic::On(false);
 
 		_index = index;
+		_func = func;
 	}
 	
 	boolean update() {
-		if (_active->updated()) {
-			printf("RVHVACFan #%d - Active: %d\n", _index, _active->getNewVal());
-		}
-		if (_speed->updated()) {
-			printf("RVHVACFan #%d - Speed: %d\n", _index, _speed->getNewVal());
+		if (_on->updated()) {
+			printf("RVHVACFan #%d - On: %d\n", _index, _on->getNewVal());
+			_func();
 		}
 		return(true);  
-	}
-
-	void setModeSpeed(FanMode mode, uint8_t speed) {
-
 	}
 };
 
@@ -314,8 +316,8 @@ struct RVThermostat : Service::Thermostat {
 		_ambientTemp = new Characteristic::CurrentTemperature(22);
 		_targetTemp = new Characteristic::TargetTemperature(22);
 		_targetTemp->setRange(10, 32, 0.5)->setVal(20);
-		_curState = new Characteristic::CurrentHeatingCoolingState(0);
-		_targetState = new Characteristic::TargetHeatingCoolingState(0);
+		_curState = new Characteristic::CurrentHeatingCoolingState(stateOff);
+		_targetState = new Characteristic::TargetHeatingCoolingState(stateOff);
 		new Characteristic::TemperatureDisplayUnits(1);
 
 		if (device->furnaceIndex != -1) {
@@ -329,7 +331,7 @@ struct RVThermostat : Service::Thermostat {
 		_compressorIndex = device->compressorIndex;
 		_furnaceIndex = device->furnaceIndex;
 
-		_fan = new RVHVACFan(_index);
+		_fan = new RVHVACFan(_index, [this]()->bool { fanOverrideChanged(); return false; });
 	}
 
 	boolean update() {
@@ -385,20 +387,30 @@ struct RVThermostat : Service::Thermostat {
 		}
 	}
 
+	void fanOverrideChanged() {
+		printf("Thermostat #%d: fan override changed\n", _index);
+	}
+
 	void setInfo(uint8_t index, ThermostatMode opMode, FanMode fanMode, uint8_t fanSpeed, double heatTemp, double coolTemp) {
 		if (index == _index) {
 			uint8_t modeConvert[] { stateOff, stateCool, stateHeat, stateOff };
 			uint8_t mode = modeConvert[opMode];
+			uint8_t newFan = fanMode == FanModeOn;
 
 			if (mode != _curState->getVal()) {
+				printf("Thermostat #%d: curState = %d\n", index, mode);
 				_curState->setVal(mode);
 				packetRecvTimer = 0;
 			}
 			if (fabs(coolTemp - _targetTemp->getVal<double>()) > 0.2) {
+				printf("Thermostat #%d: targetTemp = %f\n", index, coolTemp);
 				_targetTemp->setVal(coolTemp);
 				packetRecvTimer = 0;
 			}
-			_fan->setModeSpeed(fanMode, fanSpeed);
+			if (newFan != _fan->_on->getVal()) {
+				printf("Thermostat #%d: fan override = %d\n", index, newFan);
+				_fan->_on->setVal(newFan);
+			}
 		}
 	}
 };
@@ -569,8 +581,8 @@ void setup() {
 
 	Serial.println("Init CAN module");
 	CAN_cfg.speed = CAN_SPEED_250KBPS;
-	CAN_cfg.tx_pin_id = GPIO_NUM_25;
-	CAN_cfg.rx_pin_id = GPIO_NUM_26;
+	CAN_cfg.tx_pin_id = canTxPin;
+	CAN_cfg.rx_pin_id = canRxPin;
 	CAN_cfg.rx_queue = xQueueCreate(rx_queue_size, sizeof(CAN_frame_t));
 	ESP32Can.CANInit();
 
@@ -733,11 +745,20 @@ void processPacket(CAN_frame_t *packet, bool printPacket) {
 //////////////////////////////////////////////
 
 void loop() {
-	static elapsedMillis blinkTime;
+	static elapsedMillis heartbeatTime;
 
-	digitalWrite(indicatorPinR, (blinkTime % 2000) > 20);
-	digitalWrite(indicatorPinG, packetSendTimer > 20);
-	digitalWrite(indicatorPinB, packetRecvTimer > 20);
+	bool sendIndicator = packetSendTimer < packetBlinkTime;
+	bool recvIndicator = packetRecvTimer < packetBlinkTime;
+
+	if (sendIndicator || recvIndicator) {
+		heartbeatTime = heartbeatBlinkTime;
+	}
+
+	bool hearbeatIndicator = (heartbeatTime % heatbeatRate) < heartbeatBlinkTime;
+
+	digitalWrite(indicatorPinR, !hearbeatIndicator);
+	digitalWrite(indicatorPinG, !sendIndicator);
+	digitalWrite(indicatorPinB, !recvIndicator);
 
 	homeSpan.poll();
 

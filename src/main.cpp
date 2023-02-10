@@ -18,15 +18,20 @@ constexpr uint8_t indicatorPinB = 4;
 constexpr gpio_num_t canTxPin = GPIO_NUM_25;
 constexpr gpio_num_t canRxPin = GPIO_NUM_26;
 
-CAN_device_t CAN_cfg;               	// CAN Config
-constexpr int rx_queue_size = 10;       // Receive Queue size
+constexpr uint16_t receiveQueueSize = 10;
+constexpr uint16_t sendQueueSize = 8;
 
-elapsedMillis packetSendTimer = 1000;
-elapsedMillis packetRecvTimer = 1000;
+constexpr uint32_t sendPacketIntervalmS = 50;
+constexpr uint32_t minSendPacketIntervalmS = 5;
 
-constexpr uint32_t packetBlinkTime = 30;
+constexpr uint32_t packetBlinkTime = 25;
 constexpr uint32_t heatbeatRate = 2000;
 constexpr uint32_t heartbeatBlinkTime = 20;
+
+elapsedMillis lastPacketSendTime = 1000;
+elapsedMillis lastPacketRecvTime = 1000;
+
+CAN_device_t CAN_cfg;               	// CAN Config
 
 //////////////////////////////////////////////
 
@@ -39,12 +44,17 @@ constexpr uint32_t DC_DIMMER_COMMAND_2 = 0x1FEDB;
 constexpr uint32_t DC_DIMMER_STATUS_3 = 0x1FEDA;
 constexpr uint32_t THERMOSTAT_AMBIENT_STATUS = 0x1FF9C;
 constexpr uint32_t THERMOSTAT_STATUS_1 = 0x1FFE2;
+constexpr uint32_t THERMOSTAT_COMMAND_1 = 0x1FFE9;
+
 constexpr uint32_t AIR_CONDITIONER_STATUS = 0x1FFE0; // 1FFE1
 constexpr uint32_t GENERIC_INDICATOR_COMMAND = 0x1FED9;
 constexpr uint32_t GENERIC_CONFIGURATION_STATUS = 0x1FED8;
 constexpr uint32_t DC_SOURCE_STATUS_1 = 0x1FFFD;
 constexpr uint32_t TANK_STATUS = 0x1FFB7;
 constexpr uint32_t GENERATOR_STATUS_1 = 0x1FFDC;
+
+constexpr uint32_t FURNACE_STATUS = 0x1FFE4;
+constexpr uint32_t FURNACE_COMMAND = 0x1FFE3;
 
 //////////////////////////////////////////////
 
@@ -101,35 +111,78 @@ uint32_t makeMsg(uint32_t dgn, uint8_t sourceID=0, uint8_t priority=6) {
 	return (priority<<26) | (dgn << 8) | sourceID;	
 }
 
+constexpr double tempCOffset = -273.0;
+constexpr double tempCScale = 0.03125;
+constexpr double tempCScaleInv = 1.0 / tempCScale;
+
+double convToTempC(uint16_t value) {
+	return tempCOffset + value * tempCScale;
+}
+
+uint16_t convFromTempC(double tempC) {
+	return (tempC - tempCOffset) * tempCScaleInv;
+}
+
 //////////////////////////////////////////////
 
-void initPacket(CAN_frame_t* packet) {
-	packet->FIR.B.DLC = 8;
-	packet->FIR.B.RTR = CAN_no_RTR;
-	packet->FIR.B.FF = CAN_frame_ext;
-	for (auto i=0; i<8; i++) {
-		packet->data.u8[i] = 0xFF;
+CAN_frame_t packetQueue[sendQueueSize];
+bool packetShortGap[sendQueueSize];
+uint16_t packetQueueHead = 0;
+uint16_t packetQueueTail = 0;
+
+void processPacketQueue() {
+	if (packetQueueHead != packetQueueTail) {
+		uint16_t nextIndex = (packetQueueTail + 1) % sendQueueSize;
+		uint32_t interval = (packetShortGap[nextIndex]) ? minSendPacketIntervalmS : sendPacketIntervalmS;
+
+		if (lastPacketSendTime >= interval) {
+			printf("%d: CAN-Bus Send Packet\n", millis());
+			// ESP32Can.CANWriteFrame(&packetQueue[nextIndex]);
+			packetQueueTail = nextIndex;
+			lastPacketSendTime = 0;
+		}
 	}
 }
 
+void queuePacket(CAN_frame_t *packet, bool shortGap=false) {
+	uint16_t nextIndex = (packetQueueHead + 1) % sendQueueSize;
+
+	while (nextIndex == packetQueueTail) {	// wait if queue is full
+		processPacketQueue();
+	}
+
+	packetQueueHead = nextIndex;
+	packetQueue[packetQueueHead] = *packet;
+	packetShortGap[packetQueueHead] = shortGap;
+}
+
+void initPacket(CAN_frame_t* packet, uint8_t index, uint32_t msgID) {
+	packet->FIR.B.DLC = 8;
+	packet->FIR.B.RTR = CAN_no_RTR;
+	packet->FIR.B.FF = CAN_frame_ext;
+	for (auto i=1; i<8; i++) {
+		packet->data.u8[i] = 0xFF;
+	}
+	packet->MsgID = makeMsg(msgID);
+	packet->data.u8[0] = index;
+}
+
+//////////////////////////////////////////////
+
 void sendDCDimmerCmd(uint8_t index, uint8_t brightness, uint8_t cmd, uint8_t duration=0xFF) {
 	CAN_frame_t packet;
-	initPacket(&packet);
+	initPacket(&packet, index, DC_DIMMER_COMMAND_2);
 	uint8_t* d = packet.data.u8;
-	
-	packet.MsgID = makeMsg(DC_DIMMER_COMMAND_2);
 
-	d[0] = index;
 	d[2] = brightness;
 	d[3] = cmd;
 	d[4] = duration;
 
-	packetSendTimer = 0;
-	// ESP32Can.CANWriteFrame(&packet);
+	queuePacket(&packet);
 
-	printf("Sending packet:\n");
+	printf("Queueing Dimmer packet: #%d, bright=%d, cmd=%d, dur=%d\n", index, brightness, cmd, duration);
 	processPacket(&packet, true);
-	printf("** Packet sent.\n");
+	printf("** Packet queued.\n");
 }
 
 void sendOnOff(uint8_t index, bool on, uint8_t brightness=200) {
@@ -145,6 +198,25 @@ void sendLampLevel(uint8_t index, uint8_t brightness) {
 		printf("sendLampLevel: #%d to %d\n", index, brightness);
 		sendDCDimmerCmd(index, brightness, DCDimmerCmdSetBrightness, 0);
 	}
+}
+
+void sendThermostatCommand(uint8_t index, ThermostatMode mode, FanMode fanMode, double tempC) {
+	CAN_frame_t packet;
+	initPacket(&packet, index, THERMOSTAT_COMMAND_1);
+	uint8_t* d = packet.data.u8;
+
+	d[1] = mode | (fanMode << 4);
+	d[2] = (fanMode == FanModeOn) ? 200 : 0;
+
+	uint16_t tempVal = convFromTempC(tempC);
+	d[4] = d[6] = tempVal >> 8;
+	d[3] = d[5] = tempVal & 0xFF;
+
+	queuePacket(&packet);
+
+	printf("Queueing Thermostat packet: #%d, mode=%d, fanMode=%d, temp=%fºC\n", index, mode, fanMode, tempC);
+	processPacket(&packet, true);
+	printf("** Packet queued.\n");
 }
 
 //////////////////////////////////////////////
@@ -199,12 +271,12 @@ struct RVSwitch : SpanService {
 		if (index == _index && on != _on->getVal()) {
 			printf("Switch #%d: on = %d\n", index, on);
 			_on->setVal(on);
-			packetRecvTimer = 0;
+			lastPacketRecvTime = 0;
 		}
 		if (index == _index && _brightness && on && level != _brightness->getVal()) {
 			printf("Switch #%d: level = %d\n", index, level);
 			_brightness->setVal(level);
-			packetRecvTimer = 0;
+			lastPacketRecvTime = 0;
 		}
 	}
 };
@@ -247,15 +319,15 @@ struct RVRoofFan : Service::Fan {
 
 		if (index == _index) {
 			_fanPower = on;
-			packetRecvTimer = 0;
+			lastPacketRecvTime = 0;
 		}
 		else if (index == _upIndex && on) {
 			_lidUp = true;
-			packetRecvTimer = 0;
+			lastPacketRecvTime = 0;
 		}
 		else if (index == _downIndex && on) {
 			_lidUp = false;
-			packetRecvTimer = 0;
+			lastPacketRecvTime = 0;
 		}
 
 		bool newState = _fanPower && _lidUp;
@@ -271,21 +343,21 @@ using namespace std;
 
 struct RVHVACFan : Service::Switch {
 	SpanCharacteristic *_on;
-	function<bool()> _func;
+	function<bool()> _updateFunction;
 
 	uint8_t _index;
 
-	RVHVACFan(uint8_t index, function<bool()> func) : Service::Switch() {
+	RVHVACFan(uint8_t index, function<bool()> updateFunction) : Service::Switch() {
 		_on = new Characteristic::On(false);
 
 		_index = index;
-		_func = func;
+		_updateFunction = updateFunction;
 	}
 	
 	boolean update() {
 		if (_on->updated()) {
 			printf("RVHVACFan #%d - On: %d\n", _index, _on->getNewVal());
-			_func();
+			_updateFunction();
 		}
 		return(true);  
 	}
@@ -331,15 +403,31 @@ struct RVThermostat : Service::Thermostat {
 		_compressorIndex = device->compressorIndex;
 		_furnaceIndex = device->furnaceIndex;
 
-		_fan = new RVHVACFan(_index, [this]()->bool { fanOverrideChanged(); return false; });
+		_fan = new RVHVACFan(_index, [this]()->bool { updateThermostat(); return true; });
+	}
+
+	void updateThermostat() {
+		printf("Thermostat #%d: Send thermostat info\n", _index);
+		ThermostatMode modeLookup[] { ThermostatModeOff, ThermostatModeHeat, ThermostatModeCool };
+		ThermostatMode opMode = modeLookup[_targetState->getNewVal()];
+		FanMode fanMode = _fan->_on->getNewVal() ? FanModeOn : FanModeAuto;
+
+		sendThermostatCommand(_index, opMode, fanMode, _targetTemp->getNewVal<double>());
 	}
 
 	boolean update() {
+		bool sendInfo = false;
+
 		if (_targetState->updated()) {
 			printf("RVThermostat #%d, Target State: %d\n", _index, _targetState->getNewVal());
+			sendInfo = true;
 		}
 		if (_targetTemp->updated()) {
 			printf("RVThermostat #%d - Target Temp: %f\n", _index, _targetTemp->getNewVal<double>());
+			sendInfo = true;
+		}
+		if (sendInfo) {
+			updateThermostat();
 		}
 
 		return(true);  
@@ -353,13 +441,11 @@ struct RVThermostat : Service::Thermostat {
 			printf("Thermostat #%d: compressor = %d\n", index, on);
 			_compressorRunning = on;
 			changed = true;
-			packetRecvTimer = 0;
 		}
 		if (index == _furnaceIndex && on != _furnaceRunning) {
 			printf("Thermostat #%d: furnace = %d\n", index, on);
 			_furnaceRunning = on;
 			changed = true;
-			packetRecvTimer = 0;
 		}
 		if (changed) {
 			uint8_t newState;
@@ -375,6 +461,7 @@ struct RVThermostat : Service::Thermostat {
 			}
 			if (newState != _curState->getVal()) {
 				_curState->setVal(newState);
+				lastPacketRecvTime = 0;
 			}
 		}
 	}
@@ -383,12 +470,8 @@ struct RVThermostat : Service::Thermostat {
 		if (index == _index && fabs(tempC - _ambientTemp->getVal<double>()) > 0.2) {
 			printf("Set ambient temp #%d: %fºC\n", _index, tempC);
 			_ambientTemp->setVal(tempC);
-			packetRecvTimer = 0;
+			lastPacketRecvTime = 0;
 		}
-	}
-
-	void fanOverrideChanged() {
-		printf("Thermostat #%d: fan override changed\n", _index);
 	}
 
 	void setInfo(uint8_t index, ThermostatMode opMode, FanMode fanMode, uint8_t fanSpeed, double heatTemp, double coolTemp) {
@@ -397,19 +480,20 @@ struct RVThermostat : Service::Thermostat {
 			uint8_t mode = modeConvert[opMode];
 			uint8_t newFan = fanMode == FanModeOn;
 
-			if (mode != _curState->getVal()) {
+			if (mode != _targetState->getVal()) {
 				printf("Thermostat #%d: curState = %d\n", index, mode);
-				_curState->setVal(mode);
-				packetRecvTimer = 0;
+				_targetState->setVal(mode);
+				lastPacketRecvTime = 0;
 			}
 			if (fabs(coolTemp - _targetTemp->getVal<double>()) > 0.2) {
 				printf("Thermostat #%d: targetTemp = %f\n", index, coolTemp);
 				_targetTemp->setVal(coolTemp);
-				packetRecvTimer = 0;
+				lastPacketRecvTime = 0;
 			}
 			if (newFan != _fan->_on->getVal()) {
 				printf("Thermostat #%d: fan override = %d\n", index, newFan);
 				_fan->_on->setVal(newFan);
+				lastPacketRecvTime = 0;
 			}
 		}
 	}
@@ -503,6 +587,21 @@ const char* getValuePair(const char* buff, int16_t* val1, int16_t* val2) {
 	return buff;
 }
 
+const char* getNextValue(const char* buff, int16_t *val) {
+	*val = -1;
+	if (buff && buff[0]) {
+		*val = atoi(buff);
+		buff = strchr(buff, ',');
+		if (buff) {
+			buff += 1;
+		}
+	}
+	else {
+		buff = NULL;
+	}
+	return buff;
+}
+
 void cmdSet(const char *buff, uint8_t multiplier, const char* label) {
 	int16_t index;
 	int16_t val;
@@ -516,6 +615,9 @@ void cmdSet(const char *buff, uint8_t multiplier, const char* label) {
 			printf("%s: index=%d, val=%d\n", label, index, val);
 			setSwitchLevel(index, val*multiplier);
 		}
+		else {
+			printf("%s: parameter error!\n", label);
+		}
 	}
 }
 
@@ -527,27 +629,62 @@ void cmdSetState(const char *buff) {
 	cmdSet(buff, 200, "cmdSetState");
 }
 
-void cmsSetTemp(const char *buff) {
+void cmsSetAmbient(const char *buff) {
 	int16_t index;
-	int16_t val;
+	int16_t tempF;
 
 	buff += 1;
 	
 	while (buff) {
-		buff = getValuePair(buff, &index, &val);
+		buff = getValuePair(buff, &index, &tempF);
 
-		if (index!=-1 && val!=-1) {
-			double tempC = (val - 32.0) / 1.8;
-			printf("cmsSetTemp: index=%d, val=%dºF (%fºC)\n", index, val, tempC);
+		if (index!=-1 && tempF!=-1) {
+			double tempC = (tempF - 32.0) / 1.8;
+			printf("cmsSetAmbient: index=%d, tempF=%dºF (%fºC)\n", index, tempF, tempC);
 			setAmbientTemp(index, tempC);
+		}
+		else {
+			printf("cmsSetAmbient: parameter error!\n");
 		}
 	}
 }
 
+void cmsSetThermostat(const char *buff) {
+	int16_t index;
+	int16_t opMode;
+	int16_t tempF;
+	int16_t fanMode;
+	int16_t fanSpeed;
+
+	buff += 1;
+	
+	buff = getValuePair(buff, &index, &opMode);
+	buff = getNextValue(buff, &tempF);
+	buff = getNextValue(buff, &fanMode);
+	buff = getNextValue(buff, &fanSpeed);
+
+	if (fanMode == -1) {
+		fanMode = FanModeAuto;
+	}
+	if (fanSpeed == -1) {
+		fanSpeed = 0;
+	}
+
+	if (index!=-1 && opMode!=-1 && fanMode!=-1 && fanSpeed!=-1 && tempF!=-1) {
+		double tempC = (tempF - 32.0) / 1.8;
+		printf("cmsSetThermostat: index=%d, mode=%d, temp=%dºF (%fºC), fanMode=%d, fanSpeed=%d\n", index, opMode, tempF, tempC, fanMode, fanSpeed);
+		setThermostatInfo(index, (ThermostatMode)opMode, (FanMode)fanMode, fanSpeed, tempC, tempC);
+	}
+	else {
+		printf("cmsSetThermostat: parameter error!\n");
+	}
+}
+
 void addCommands() {
-	new SpanUserCommand('t',"<index>=<temperature>,... - set temperature of <index> to <val:ºF>", cmsSetTemp);
-	new SpanUserCommand('l',"<index>=<level>,... - set level of <index> to <val:0-200>", cmdSetLevel);
-	new SpanUserCommand('s',"<index>=<level>,... - set state of <index> to <val:0-1>", cmdSetState);
+	new SpanUserCommand('l',"<index>=<level:0-200>,... - set level of <index>", cmdSetLevel);
+	new SpanUserCommand('s',"<index>=<state:0-1>,... - set state of <index>", cmdSetState);
+	new SpanUserCommand('a',"<index>=<tempºF>,... - set ambient temp of <index>", cmsSetAmbient);
+	new SpanUserCommand('t',"<index>=<mode:0-2>,<tempºF>,optional(<fanmode:0-1>,<fanspeed:0-200>) - set info for thermostat <index>", cmsSetThermostat);
 }
 
 //////////////////////////////////////////////
@@ -583,7 +720,7 @@ void setup() {
 	CAN_cfg.speed = CAN_SPEED_250KBPS;
 	CAN_cfg.tx_pin_id = canTxPin;
 	CAN_cfg.rx_pin_id = canRxPin;
-	CAN_cfg.rx_queue = xQueueCreate(rx_queue_size, sizeof(CAN_frame_t));
+	CAN_cfg.rx_queue = xQueueCreate(receiveQueueSize, sizeof(CAN_frame_t));
 	ESP32Can.CANInit();
 
 	Serial.println("Init HomeSpan");
@@ -598,10 +735,6 @@ void setup() {
 }
 
 //////////////////////////////////////////////
-
-double convToTempC(uint16_t value) {
-	return -273.0 + value * 0.03125;
-}
 
 void processPacket(CAN_frame_t *packet, bool printPacket) {
 	if (packet->FIR.B.RTR == CAN_RTR) {
@@ -658,6 +791,7 @@ void processPacket(CAN_frame_t *packet, bool printPacket) {
 			uint8_t instance = d[0];
 			ThermostatMode opMode = (ThermostatMode)(d[1] & 0x0F);
 			FanMode fanMode = (FanMode)((d[1]>>4) & 0x03);
+			uint8_t scheduleEnabled = ((d[1]>>6) & 0x03);
 			uint8_t fanSpeed = d[2];
 			double heatTemp = convToTempC(d[4]<<8 | d[3]);
 			double coolTemp = convToTempC(d[6]<<8 | d[5]);
@@ -675,6 +809,12 @@ void processPacket(CAN_frame_t *packet, bool printPacket) {
 			uint8_t deadBand = d[6];
 			uint8_t deadBand2 = d[7];
 			
+		}
+		else if (dgn == FURNACE_STATUS) {
+			uint8_t instance = d[0];
+			ACMode opMode = (ACMode)(d[1] & 0x03);
+			uint8_t fanSpeed = d[4];
+
 		}
 		else if (dgn == GENERIC_INDICATOR_COMMAND) {
 			// printf("GENERIC_INDICATOR_COMMAND: inst=%d, grp=0X%02X, bright=%d, bank=%d, dur=%d, func=%d\n", d[0], d[1], d[2], d[3], d[4], d[6]);
@@ -747,8 +887,8 @@ void processPacket(CAN_frame_t *packet, bool printPacket) {
 void loop() {
 	static elapsedMillis heartbeatTime;
 
-	bool sendIndicator = packetSendTimer < packetBlinkTime;
-	bool recvIndicator = packetRecvTimer < packetBlinkTime;
+	bool sendIndicator = lastPacketSendTime < packetBlinkTime;
+	bool recvIndicator = lastPacketRecvTime < packetBlinkTime;
 
 	if (sendIndicator || recvIndicator) {
 		heartbeatTime = heartbeatBlinkTime;
@@ -767,6 +907,8 @@ void loop() {
 	if (xQueueReceive(CAN_cfg.rx_queue, &packet, 0) == pdTRUE) {
 		processPacket(&packet);
 	}
+
+	processPacketQueue();
 
 	// static elapsedMillis toggleTime;
 

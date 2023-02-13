@@ -4,8 +4,9 @@
 
 ## Features
 
-* Uses ESP32 with a CAN-Bus interface
 * Connects to RV-C network in many recent model RVs
+    * (RV-C is a subset of CAN-Bus)
+* Uses ESP32 with a CAN-Bus interface
 * Connects lights, fans, and thermostats to HomeKit
 * Plugs into unused CAN-Bus connectors inside control panel.
 
@@ -16,7 +17,7 @@
 
 ## To-Do:
 
-* Routing Can-Bus messages to HomeKit devices
+* Routing CAN-Bus messages to HomeKit devices
 * Verify sending of correct RV-C messages
 
 ## Hardware
@@ -40,16 +41,20 @@ Insert 24AWG wires into connector and compress to make connections. Twist the da
 
 ## Firmware Setup
 
+- Project is set up for compilation with PlatformIO
 - config.h
+    * Rename config-sample.h to config.h
     * Enter Wifi SSID and password for the RV network.
     * Include a definition file for the RV devices (see Miramar.h for an example)
         * Each light will have an output number and a name, and a flag specifying if it can be dimmed.
         * Each fan has three output numbers, one for the fan power, and one each for the up and down output.
-        * Each thermostat has a number, and output numbers for the A/C compressor and furnace outputs.
+        * Each thermostat has a number, and output numbers for the A/C compressor, low fan, high fan, and furnace outputs.
+        * Output numbers can be determined from the "G7 Panel Outputs" screen of the Network Diagnostics of your Multiplex Control Panel (or equivalent).
 - Flashing
     * Note: If using an ESP32 with a USB-C connector and flashing from a Mac, you may need to connect it via a USB hub due to some timing weirdness around resetting the ESP32 into boot mode.
 - Startup
-    * You should see allof the startup logging.
+    * Connect to the ESP32 via Serial Monitor.
+    * You should see all of the startup logging.
     * Then a message about being connected to Wifi.
 - Pairing
     * In the Home app choose "Add Accessory".

@@ -17,8 +17,8 @@ typedef struct {
 
 typedef struct {
     uint8_t index;
-    uint8_t upIndex;
-    uint8_t downIndex;
+    int8_t upIndex;
+    int8_t downIndex;
     const char* name;
 } FanDeviceRec;
 

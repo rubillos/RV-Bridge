@@ -21,11 +21,11 @@ const SwitchDeviceRec switchList[] = {
 // index, upIndex, downIndex, name
 const FanDeviceRec fanList[] = {
     20, 51, 52, "Kitchen",
-    21, 47, 48, "Bathroom"
+    21, -1, -1, "Bathroom"
 };
 
 // index, compressorIndex, fanHIndex, fanLIndex, furnaceIndex, name
 const ThermostatDeviceRec thermostatList[] = {
-    1, 25, 26, 27, 33, "Front",
-    2, 29, 30, 31, -1, "Back"
+    0, 25, 26, 27, 33, "Front",
+    1, 29, 30, 31, -1, "Back"
 };

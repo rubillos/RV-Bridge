@@ -5,7 +5,7 @@
 ## Features
 
 * Connects to RV-C network in many recent model RVs
-    * (RV-C is a subset of CAN-Bus)
+    * (RV-C is a subset of CAN-Bus running at 250kbps)
 * Uses ESP32 with a CAN-Bus interface
 * Connects lights, fans, and thermostats to HomeKit
 * Plugs into unused CAN-Bus connectors inside control panel.
@@ -14,11 +14,14 @@
 
 * Homespan pairing works, devices show up in Home app.
 * CAN-Bus receiving works.
+* CAN-Bus messages route correctly to HomeKit devices
+* Correct RV-C messages are being sent
 
 ## To-Do:
 
-* Routing CAN-Bus messages to HomeKit devices
-* Verify sending of correct RV-C messages
+* Verify thermostat functions
+* RV device state changes are recognized by the packet inspector but not reflected in the HomeKit device states.
+*   - Added code to make all HK characteristic changes within the service's loop function to hopefully fix that.
 
 ## Hardware
 

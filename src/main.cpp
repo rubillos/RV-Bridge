@@ -44,9 +44,10 @@ enum {
 	packetPrintIfUnknown
 };
 
-void processPacket(CAN_frame_t *packet, uint8_t printPacket=packetPrintYes);
+void processPacket(CAN_frame_t *packet, uint8_t printPacket=packetPrintIfUnknown);
 
 //////////////////////////////////////////////
+// RV-C dgn numbers
 
 constexpr uint32_t DATE_TIME_STATUS = 0x1FFFF;
 constexpr uint32_t DC_DIMMER_COMMAND_2 = 0x1FEDB;
@@ -103,6 +104,9 @@ typedef enum {
 	FanModeOn
 } FanMode;
 
+constexpr uint8_t RVCPercentMax = 250;
+constexpr uint8_t HomeKitPercentMax = 100;
+
 //////////////////////////////////////////////
 
 uint32_t getMsgBits(uint32_t msg, int8_t startBit, int8_t numBits) {
@@ -146,7 +150,7 @@ void processPacketQueue() {
 
 		if (lastPacketSendTime >= interval) {
 			printf("%d: CAN-Bus Send Packet\n", millis());
-			// ESP32Can.CANWriteFrame(&packetQueue[nextIndex]);
+			ESP32Can.CANWriteFrame(&packetQueue[nextIndex]);
 			packetQueueTail = nextIndex;
 			lastPacketSendTime = 0;
 		}
@@ -169,11 +173,11 @@ void initPacket(CAN_frame_t* packet, uint8_t index, uint32_t msgID) {
 	packet->FIR.B.DLC = 8;
 	packet->FIR.B.RTR = CAN_no_RTR;
 	packet->FIR.B.FF = CAN_frame_ext;
+	packet->MsgID = makeMsg(msgID);
+	packet->data.u8[0] = index;
 	for (auto i=1; i<8; i++) {
 		packet->data.u8[i] = 0xFF;
 	}
-	packet->MsgID = makeMsg(msgID);
-	packet->data.u8[0] = index;
 }
 
 //////////////////////////////////////////////
@@ -186,17 +190,19 @@ void sendDCDimmerCmd(uint8_t index, uint8_t brightness, uint8_t cmd, uint8_t dur
 	d[2] = brightness;
 	d[3] = cmd;
 	d[4] = duration;
+	d[5] = 0;				// no interlock
 
 	queuePacket(&packet);
 
 	printf("Queueing Dimmer packet: #%d, bright=%d, cmd=%d, dur=%d\n", index, brightness, cmd, duration);
-	processPacket(&packet, packetPrintIfUnknown);
+	processPacket(&packet, packetPrintYes);
 	printf("** Packet queued.\n");
 }
 
-void sendOnOff(uint8_t index, bool on, uint8_t brightness=200) {
+void sendOnOff(uint8_t index, bool on, uint8_t brightness=RVCPercentMax) {
 	printf("sendOnOff: #%d to %d\n", index, on);
 	sendDCDimmerCmd(index, brightness, (on) ? DCDimmerCmdOnDuration : DCDimmerCmdOff);
+	// sendDCDimmerCmd(index, brightness, DCDimmerCmdToggle);
 }
 
 void sendLampLevel(uint8_t index, uint8_t brightness) {
@@ -239,6 +245,9 @@ struct RVSwitch : SpanService {
 	uint8_t _index;
 	SwitchType _type;
 
+	int16_t _newOnVal = -1;
+	int16_t _newBrightnessVal = -1;
+
 	RVSwitch(SwitchDeviceRec *device) : SpanService( switchTypes[device->type], switchHapNames[device->type] ) {
 		_index = device->index;
 		_type = device->type;
@@ -256,15 +265,15 @@ struct RVSwitch : SpanService {
 		_on = new Characteristic::On();
 
 		if (_type == DimmableLamp) {
-			_brightness = new Characteristic::Brightness(100);
-			_brightness->setRange(0, 100, 1);
+			_brightness = new Characteristic::Brightness(HomeKitPercentMax);
+			_brightness->setRange(0, HomeKitPercentMax, 1);
 		}
 	}
 	
 	boolean update() {
 		if (_on->updated() || (_brightness && _brightness->updated())) {
 			if (_brightness) {
-				sendLampLevel(_index, _on->getNewVal() * _brightness->getNewVal() * 2);
+				sendLampLevel(_index, _on->getNewVal() * _brightness->getNewVal() * RVCPercentMax / HomeKitPercentMax);
 			}
 			else {
 				sendOnOff(_index, _on->getNewVal());
@@ -272,19 +281,32 @@ struct RVSwitch : SpanService {
 		}
 		return(true);  
 	}
+
+	void loop() {
+		if (_newOnVal != -1) {
+			printf("Loop - Switch #%d: on = %d\n", index, _newOnVal);
+			_on->setVal(_newOnVal);
+			_newOnVal = -1;
+		}
+		if (_newBrightnessVal != -1) {
+			printf("Switch #%d: level = %d\n", index, _newBrightnessVal);
+			_brightness->setVal(_newBrightnessVal);
+			_newBrightnessVal = -1;
+		}
+	}
 	
-	void setLevel(uint8_t index, uint8_t level) {
-		bool on = level > 0;
-		level /= 2;
+	void setLevel(uint8_t index, uint8_t dcDimmerLevel) {
+		bool on = dcDimmerLevel > 0;
+		uint16_t level = dcDimmerLevel * HomeKitPercentMax / RVCPercentMax;
 
 		if (index == _index && on != _on->getVal()) {
 			printf("Switch #%d: on = %d\n", index, on);
-			_on->setVal(on);
+			_newOnVal = on;
 			lastPacketRecvTime = 0;
 		}
-		if (index == _index && _brightness && on && level != _brightness->getVal()) {
+		if (_brightness && index == _index && on && level != _brightness->getVal()) {
 			printf("Switch #%d: level = %d\n", index, level);
-			_brightness->setVal(level);
+			_newBrightnessVal = level;
 			lastPacketRecvTime = 0;
 		}
 	}
@@ -299,6 +321,8 @@ struct RVRoofFan : Service::Fan {
 	bool _fanPower = false;
 	bool _lidUp = false;
 
+	int16_t _newActiveVal = -1;
+
 	RVRoofFan(FanDeviceRec *device) : Service::Fan() {
 		_index = device->index;
 		_upIndex = device->upIndex;
@@ -310,19 +334,29 @@ struct RVRoofFan : Service::Fan {
 		if (_active->updated()) {
 			bool newValue = _active->getNewVal();
 			sendOnOff(_index, newValue);
-			if (newValue) {
-				sendOnOff(_downIndex, false);
-				sendOnOff(_upIndex, true);
-			}
-			else {
-				sendOnOff(_upIndex, false);
-				sendOnOff(_downIndex, true);
+			if (_upIndex != -1 && _downIndex!=-1) {
+				if (newValue) {
+					sendOnOff(_downIndex, false);
+					sendOnOff(_upIndex, true);
+				}
+				else {
+					sendOnOff(_upIndex, false);
+					sendOnOff(_downIndex, true);
+				}
 			}
 		}
 
 		return(true);  
 	}
 	
+	void loop() {
+		if (_newActiveVal != -1) {
+			printf("Loop - Fan #%d: active = %d\n", index, _newActiveVal);
+			_active->setVal(_newActiveVal);
+			_newActiveVal = -1;
+		}
+	}
+
 	void setLevel(uint8_t index, uint8_t level) {
 		bool on = level > 0;
 
@@ -339,15 +373,16 @@ struct RVRoofFan : Service::Fan {
 			lastPacketRecvTime = 0;
 		}
 
-		bool newState = _fanPower && _lidUp;
+		bool newState = _fanPower && (_upIndex==-1 || _lidUp);
 
 		if (newState != _active->getVal()) {
 			printf("Fan #%d: active = %d\n", index, newState);
-			_active->setVal(newState);
+			_newActiveVal = newState;
 		}
 	}
 };
 
+// HomeKit thermostat values
 enum {
 	currentFanStateInactive = 0,
 	currentFanStateIdle,
@@ -361,12 +396,12 @@ enum {
 	heatingCoolingStateCool
 };
 
-
 struct RVHVACFan : Service::Fan {
 	SpanCharacteristic *_active;
 	SpanCharacteristic *_currentState;
 	SpanCharacteristic *_targetState;
 	SpanCharacteristic *_speed;
+	
 	std::function<bool()> _updateFunction;
 
 	uint8_t _index;
@@ -375,10 +410,14 @@ struct RVHVACFan : Service::Fan {
 	bool _fanHRunning = false;
 	bool _fanLRunning = false;
 
+	int16_t _newActiveVal = -1;
+	int16_t _newSpeedVal = -1;
+	int16_t _newCurrentStateVal = -1;
+
 	RVHVACFan(ThermostatDeviceRec *device, std::function<bool()> updateFunction) : Service::Fan() {
-		_active = new Characteristic::Active();
-		_speed = new Characteristic::RotationSpeed();
-		_speed->setRange(0, 100, 50);
+		_active = new Characteristic::Active(false);
+		_speed = new Characteristic::RotationSpeed(0);
+		_speed->setRange(0, HomeKitPercentMax, HomeKitPercentMax/2);
 		_currentState = new Characteristic::CurrentFanState(currentFanStateIdle);
 		_targetState = new Characteristic::TargetFanState(targetFanStateAuto);
 	
@@ -408,27 +447,42 @@ struct RVHVACFan : Service::Fan {
 		return(true);  
 	}
 
+	void loop() {
+		if (_newActiveVal != -1) {
+			printf("Loop - RVHVACFan #%d - setActive: %d\n", _index, _newActiveVal);
+			_active->setVal(_newActiveVal);
+			_newActiveVal = -1;
+		}
+		if (_newSpeedVal != -1) {
+			printf("Loop - RVHVACFan #%d - setSpeed: %d\n", _index, _newSpeedVal);
+			_speed->setVal(_newSpeedVal);
+			_newSpeedVal = -1;
+		}
+		if (_newCurrentStateVal != -1) {
+			printf("Loop - RVHVACFan #%d - currentState: %d\n", _index, _newCurrentStateVal);
+			_currentState->setVal(_newCurrentStateVal);
+			_newCurrentStateVal = -1;
+		}
+	}
+
 	void setModeSpeed(FanMode fanMode, uint8_t speed) {
 		bool newActive = fanMode == FanModeOn;
-		speed /= 2;
+		speed = speed * HomeKitPercentMax / RVCPercentMax;
 
 		if (newActive != _active->getVal()) {
 			printf("RVHVACFan #%d - setActive: %d\n", _index, newActive);
-			_active->setVal(newActive);
+			_newActiveVal = newActive;
 		}
 		if (speed != _speed->getVal()) {
 			printf("RVHVACFan #%d - setSpeed: %d\n", _index, speed);
-			_speed->setVal(speed);
+			_newSpeedVal = speed;
 		}
 	}
 
 	void getModeSpeed(FanMode* fanMode, uint8_t *speed) {
-		bool active = _active->getNewVal();
-		uint8_t curSpeed = _speed->getNewVal();
-
-		if (active) {
+		if (_active->getNewVal()) {
 			*fanMode = FanModeOn;
-			*speed = curSpeed * 2;
+			*speed = _speed->getNewVal() * RVCPercentMax / HomeKitPercentMax;
 		}
 		else {
 			*fanMode = FanModeAuto;
@@ -451,8 +505,8 @@ struct RVHVACFan : Service::Fan {
 		uint8_t newState = (_fanHRunning || _fanLRunning) ? currentFanStateBlowing : currentFanStateIdle;
 
 		if (newState != _currentState->getVal()) {
-			printf("HVACFan #%d: curState = %d\n", _index, newState);
-			_currentState->setVal(newState);
+			printf("HVACFan #%d: currentState = %d\n", _index, newState);
+			_newCurrentStateVal = newState;
 		}
 	}
 };
@@ -461,7 +515,7 @@ struct RVThermostat : Service::Thermostat {
 	SpanCharacteristic *_ambientTemp;
 	SpanCharacteristic *_targetTemp;
 	SpanCharacteristic *_targetState;
-	SpanCharacteristic *_curState;
+	SpanCharacteristic *_currentState;
 
 	RVHVACFan *_fan;
 
@@ -472,19 +526,24 @@ struct RVThermostat : Service::Thermostat {
 	bool _compressorRunning = false;
 	bool _furnaceRunning = false;
 
+	int16_t _newAmbientTempVal = -1;
+	int16_t _newTargetTempVal = -1;
+	int16_t _newTargetStateVal = -1;
+	int16_t _newCurrentStateVal = -1;
+
 	RVThermostat(ThermostatDeviceRec *device) : Service::Thermostat() {
-		_ambientTemp = new Characteristic::CurrentTemperature(22);
-		_targetTemp = new Characteristic::TargetTemperature(22);
+		_ambientTemp = new Characteristic::CurrentTemperature(20);
+		_targetTemp = new Characteristic::TargetTemperature();
 		_targetTemp->setRange(10, 32, 0.5)->setVal(20);
-		_curState = new Characteristic::CurrentHeatingCoolingState(heatingCoolingStateOff);
+		_currentState = new Characteristic::CurrentHeatingCoolingState(heatingCoolingStateOff);
 		_targetState = new Characteristic::TargetHeatingCoolingState(heatingCoolingStateOff);
 		new Characteristic::TemperatureDisplayUnits(1);
 
 		if (device->furnaceIndex != -1) {
-			_targetState->setValidValues(3, 0, 1, 2);
+			_targetState->setValidValues(3, heatingCoolingStateOff, heatingCoolingStateHeat, heatingCoolingStateCool);
 		}
 		else {
-			_targetState->setValidValues(2, 0, 2);
+			_targetState->setValidValues(2, heatingCoolingStateOff, heatingCoolingStateCool);
 		}
 
 		_index = device->index;
@@ -524,6 +583,29 @@ struct RVThermostat : Service::Thermostat {
 		return(true);  
 	}
 
+	void loop() {
+		if (_newAmbientTempVal != -1) {
+			printf("Loop - Set ambient temp #%d: %fºC\n", _index, _newAmbientTempVal);
+			_ambientTemp->setVal(_newAmbientTempVal);
+			_newAmbientTempVal = -1;
+		}
+		if (_newTargetTempVal != -1) {
+			printf("Loop - RVHVACFan #%d - targetTemp: %d\n", _index, _newTargetTempVal);
+			_targetTemp->setVal(_newTargetTempVal);
+			_newTargetTempVal = -1;
+		}
+		if (_newTargetStateVal != -1) {
+			printf("Loop - Thermostat #%d: targetState = %d\n", index, _newTargetStateVal);
+			_targetState->setVal(_newTargetStateVal);
+			_newTargetStateVal = -1;
+		}
+		if (_newCurrentStateVal != -1) {
+			printf("Loop - Thermostat #%d: currentState = %d\n", index, _newCurrentStateVal);
+			_currentState->setVal(_newCurrentStateVal);
+			_newCurrentStateVal = -1;
+		}
+	}
+
 	void setLevel(uint8_t index, uint8_t level) {
 		bool on = level > 0;
 		bool changed = false;
@@ -550,8 +632,8 @@ struct RVThermostat : Service::Thermostat {
 			else {
 				newState = heatingCoolingStateOff;
 			}
-			if (newState != _curState->getVal()) {
-				_curState->setVal(newState);
+			if (newState != _currentState->getVal()) {
+				_newCurrentStateVal = newState;
 				lastPacketRecvTime = 0;
 			}
 		}
@@ -561,7 +643,7 @@ struct RVThermostat : Service::Thermostat {
 	void setAmbientTemp(uint8_t index, double tempC) {
 		if (index == _index && fabs(tempC - _ambientTemp->getVal<double>()) > 0.2) {
 			printf("Set ambient temp #%d: %fºC\n", _index, tempC);
-			_ambientTemp->setVal(tempC);
+			_newAmbientTempVal = tempC;
 			lastPacketRecvTime = 0;
 		}
 	}
@@ -573,13 +655,13 @@ struct RVThermostat : Service::Thermostat {
 			uint8_t newFan = fanMode == FanModeOn;
 
 			if (mode != _targetState->getVal()) {
-				printf("Thermostat #%d: curState = %d\n", index, mode);
-				_targetState->setVal(mode);
+				printf("Thermostat #%d: targetState = %d\n", index, mode);
+				_newTargetStateVal = mode;
 				lastPacketRecvTime = 0;
 			}
 			if (fabs(coolTemp - _targetTemp->getVal<double>()) > 0.2) {
 				printf("Thermostat #%d: targetTemp = %f\n", index, coolTemp);
-				_targetTemp->setVal(coolTemp);
+				_newTargetTempVal = coolTemp;
 				lastPacketRecvTime = 0;
 			}
 			_fan->setModeSpeed(fanMode, fanSpeed);
@@ -714,7 +796,7 @@ void cmdSetLevel(const char *buff) {
 }
 
 void cmdSetState(const char *buff) {
-	cmdSet(buff, 200, "cmdSetState");
+	cmdSet(buff, RVCPercentMax, "cmdSetState");
 }
 
 void cmsSetAmbient(const char *buff) {
@@ -768,11 +850,31 @@ void cmsSetThermostat(const char *buff) {
 	}
 }
 
+void cmdSendOnOff(const char *buff) {
+	int16_t index;
+	int16_t val;
+
+	buff += 1;
+	
+	while (buff) {
+		buff = getValuePair(buff, &index, &val);
+
+		if (index!=-1 && val!=-1) {
+			printf("cmdSendOnOff: index=%d, val=%d\n", index, val);
+			sendOnOff(index, val);
+		}
+		else {
+			printf("cmdSendOnOff: parameter error!\n");
+		}
+	}
+}
+
 void addCommands() {
-	new SpanUserCommand('l',"<index>=<level:0-200>,... - set level of <index>", cmdSetLevel);
+	new SpanUserCommand('l',"<index>=<level:0-250>,... - set level of <index>", cmdSetLevel);
 	new SpanUserCommand('s',"<index>=<state:0-1>,... - set state of <index>", cmdSetState);
+	new SpanUserCommand('o',"<index>=<state:0-1>,... - send onOff to <index>", cmdSendOnOff);
 	new SpanUserCommand('a',"<index>=<tempºF>,... - set ambient temp of <index>", cmsSetAmbient);
-	new SpanUserCommand('t',"<index>=<mode:0-2>,<tempºF>,optional(<fanmode:0-1>,<fanspeed:0-200>) - set info for thermostat <index>", cmsSetThermostat);
+	new SpanUserCommand('t',"<index>=<mode:0-2>,<tempºF>,optional(<fanmode:0-1>,<fanspeed:0-250>) - set info for thermostat <index>", cmsSetThermostat);
 }
 
 //////////////////////////////////////////////
@@ -868,7 +970,7 @@ void processPacket(CAN_frame_t *packet, uint8_t printPacket) {
 			DCDimmerCmd lastCmd = (DCDimmerCmd)d[5];
 			uint8_t status = (d[6] >> 2) & 3;
 
-			printf("DC_DIMMER_STATUS_3: inst=%d, grp=0X%02X, bright=%d, enable=%d, dur=%d, last cmd=%d, status=0X%02X\n", instance, group, brightness, enable, delayDuration, lastCmd, status);				
+			// printf("DC_DIMMER_STATUS_3: inst=%d, grp=0X%02X, bright=%d, enable=%d, dur=%d, last cmd=%d, status=0X%02X\n", instance, group, brightness, enable, delayDuration, lastCmd, status);				
 			setSwitchLevel(instance, brightness);
 		}
 		else if (dgn == DC_DIMMER_COMMAND_2) {
@@ -878,13 +980,16 @@ void processPacket(CAN_frame_t *packet, uint8_t printPacket) {
 			DCDimmerCmd cmd = (DCDimmerCmd)d[3];
 			uint8_t delayDuration = d[4];
 
-			printf("DC_DIMMER_COMMAND_2: inst=%d, grp=0X%02X, bright=%d, cmd=0X%02X, dur=%d\n", instance, group, brightness, cmd, delayDuration);				
+			if (instance!=32 && instance!=43 && instance!=44 && instance!=53 && instance!=54 && instance!=55 && instance!=56) {
+				printf("DC_DIMMER_COMMAND_2: inst=%d, grp=0X%02X, bright=%d, cmd=0X%02X, dur=%d\n", instance, group, brightness, cmd, delayDuration);	
+				printPacket = packetPrintYes;			
+			}
 		}
 		else if (dgn == THERMOSTAT_AMBIENT_STATUS) {
 			uint8_t instance = d[0];
 			double tempC = convToTempC(d[2]<<8 | d[1]);
 			
-			printf("THERMOSTAT_AMBIENT_STATUS: temp=%fºC\n", tempC);
+			// printf("THERMOSTAT_AMBIENT_STATUS: #%d, temp=%fºC\n", instance, tempC);
 			setAmbientTemp(instance, tempC);
 		}
 		else if (dgn == THERMOSTAT_STATUS_1 || dgn == THERMOSTAT_COMMAND_1) {
@@ -896,8 +1001,8 @@ void processPacket(CAN_frame_t *packet, uint8_t printPacket) {
 			double heatTemp = convToTempC(d[4]<<8 | d[3]);
 			double coolTemp = convToTempC(d[6]<<8 | d[5]);
 			
-			const char* dgnName = (dgn == THERMOSTAT_STATUS_1) ? "THERMOSTAT_STATUS_1" : "THERMOSTAT_COMMAND_1";
-			printf("%s: inst=%d, opMode=%d, fanMode=%d, fanSpeed=%d, heatTemp=%fºC, coolTemp=%fºC\n", dgnName, instance, opMode, fanMode, fanSpeed, heatTemp, coolTemp);
+			// const char* dgnName = (dgn == THERMOSTAT_STATUS_1) ? "THERMOSTAT_STATUS_1" : "THERMOSTAT_COMMAND_1";
+			// printf("%s: inst=%d, opMode=%d, fanMode=%d, fanSpeed=%d, heatTemp=%fºC, coolTemp=%fºC\n", dgnName, instance, opMode, fanMode, fanSpeed, heatTemp, coolTemp);
 			setThermostatInfo(instance, opMode, fanMode, fanSpeed, heatTemp, coolTemp);
 		}
 		else if (dgn == AIR_CONDITIONER_STATUS) {
@@ -994,7 +1099,7 @@ void loop() {
 	bool recvIndicator = lastPacketRecvTime < packetBlinkTime;
 
 	if (sendIndicator || recvIndicator) {
-		heartbeatTime = heartbeatBlinkTime;
+		heartbeatTime = heartbeatBlinkTime;		// adjust next heartbeat time to avoid overlap with send/recv indicators
 	}
 
 	bool hearbeatIndicator = (heartbeatTime % heatbeatRate) < heartbeatBlinkTime;
@@ -1012,60 +1117,4 @@ void loop() {
 	}
 
 	processPacketQueue();
-
-	// static elapsedMillis toggleTime;
-
-	// if (false && toggleTime > 3000) {
-	// 	toggleTime = 0;
-
-		// pri=6, dgn=0x1FEDB, src=9F
-		// DC_DIMMER_COMMAND_2 (1FEDB):
-		//    inst=17, grp=0XFF, bright=200, cmd=0X05, dur=255, lock=0X00
-
-		// DC_DIMMER_COMMAND_2: inst=17, grp=0XFF, bright=200, cmd=0X05, dur=255, lock=0X00
-		// Extended packet pri=6, dgn=0x1FEDB, src=FC, Data 0x11 0xFF 0xC8 0x05 0xFF 0x00 0xFF 0xFF 
-
-		// Sending toggle
-		// DC_DIMMER_COMMAND_2: inst=17, grp=0XFF, bright=200, cmd=0X05, dur=255, lock=0X00
-		// Standard frame pri=6, dgn=0x1FEDB, src=81, Data 0x11 0xFF 0xC8 0x05 0xFF 0x00 0x00 0x00 
-
-		// CAN_frame_t tx_packet;
-		// uint8_t* d = tx_packet.data.u8;
-
-		// tx_packet.FIR.B.FF = CAN_frame_ext;
-		// tx_packet.MsgID = makeMsg(0x1FEDB);
-
-		// tx_packet.FIR.B.DLC = 8;
-		// d[0] = 17;
-		// d[1] = 0xFF;
-		// d[2] = 200;
-		// d[3] = 5; // toggle
-		// d[4] = 255;
-		// d[5] = 0;
-
-		// d[6] = 0xFF;
-		// d[7] = 0xFF;
-
-		// printf("Sending toggle\n");
-		// ESP32Can.CANWriteFrame(&tx_packet);
-
-		// processPacket(&tx_packet, true);
-	}
-	// Send CAN Message
-//   if (currentMillis - previousMillis >= interval) {
-//     previousMillis = currentMillis;
-//     CAN_frame_t tx_packet;
-//     tx_packet.FIR.B.FF = CAN_frame_std;
-//     tx_packet.MsgID = 0x001;
-//     tx_packet.FIR.B.DLC = 8;
-//     tx_packet.data.u8[0] = 0x00;
-//     tx_packet.data.u8[1] = 0x01;
-//     tx_packet.data.u8[2] = 0x02;
-//     tx_packet.data.u8[3] = 0x03;
-//     tx_packet.data.u8[4] = 0x04;
-//     tx_packet.data.u8[5] = 0x05;
-//     tx_packet.data.u8[6] = 0x06;
-//     tx_packet.data.u8[7] = 0x07;
-//     ESP32Can.CANWriteFrame(&tx_packet);
-//   }
-// }
+}

@@ -81,6 +81,10 @@ Insert 24AWG wires into connector and compress to make connections. Twist the da
     * Set extrusion width to 0.55 (eliminates tiny infill strips in walls)
     * Perimeter transitioning threshold angle to 20 (keeps the lettering connected)
 
+## Notes
+
+- If the bridge seems to become unresponsive at some point, verify that the controlling device is on the RV's Wifi and not some other Wifi.
+
 ## References
 
 To-Do

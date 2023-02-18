@@ -44,7 +44,8 @@ enum {
 	packetPrintIfUnknown
 };
 
-void processPacket(CAN_frame_t *packet, uint8_t printPacket=packetPrintIfUnknown);
+void processPacket(CAN_frame_t *packet, uint8_t printPacket);
+uint8_t packetPrintMode = packetPrintNo;
 
 //////////////////////////////////////////////
 // RV-C dgn numbers
@@ -236,9 +237,9 @@ void sendThermostatCommand(uint8_t index, ThermostatMode mode, FanMode fanMode, 
 
 	queuePacket(&packet);
 
-	printf("Queueing Thermostat packet: #%d, mode=%d, fanMode=%d, temp=%fºC\n", index, mode, fanMode, tempC);
-	processPacket(&packet, packetPrintIfUnknown);
-	printf("** Packet queued.\n");
+	// printf("Queueing Thermostat packet: #%d, mode=%d, fanMode=%d, temp=%fºC\n", index, mode, fanMode, tempC);
+	// processPacket(&packet, packetPrintIfUnknown);
+	// printf("** Packet queued.\n");
 }
 
 //////////////////////////////////////////////
@@ -819,12 +820,35 @@ void cmdSetCANWrite(const char *buff) {
 	}
 }
 
+void cmdSetPacketLog(const char *buff) {
+	buff++;
+	while (buff[0]==' ') buff++;
+
+	switch (buff[0]) {
+		case '0':
+			packetPrintMode = packetPrintNo;
+			printf("Packet logging: Off.\n");
+			break;
+		case '1':
+			packetPrintMode = packetPrintYes;
+			printf("Packet logging: On.\n");
+			break;
+		case '2':
+			packetPrintMode = packetPrintIfUnknown;
+			printf("Packet logging: If Unknown.\n");
+			break;
+		default:
+			printf("cmdSetPacketLog: parameter error!\n");
+	}
+}
+
 void addCommands() {
 	new SpanUserCommand('l',"<index>=<level:0-250>,... - set level of <index>", cmdSetLevel);
 	new SpanUserCommand('s',"<index>=<state:0-1>,... - set state of <index>", cmdSetState);
 	new SpanUserCommand('o',"<index>=<state:0-1>,... - send onOff to <index>", cmdSendOnOff);
 	new SpanUserCommand('a',"<index>=<tempºF>,... - set ambient temp of <index>", cmdSetAmbient);
 	new SpanUserCommand('w',"<0-1>,... - set CAN-Bus write enable", cmdSetCANWrite);
+	new SpanUserCommand('p',"<0-2>,... - set packet logging: 0=No, 1=Yes, 2=If unknown", cmdSetPacketLog);
 	new SpanUserCommand('t',"<index>=<mode:0-2>,<tempºF>,optional(<fanmode:0-1>,<fanspeed:0-250>) - set info for thermostat <index>", cmsSetThermostat);
 }
 
@@ -939,10 +963,10 @@ void processPacket(CAN_frame_t *packet, uint8_t printPacket) {
 			DCDimmerCmd cmd = (DCDimmerCmd)d[3];
 			uint8_t delayDuration = d[4];
 
-			if (instance!=32 && instance!=43 && instance!=44 && instance!=53 && instance!=54 && instance!=55 && instance!=56) {
-				printf("DC_DIMMER_COMMAND_2: inst=%d, grp=0X%02X, bright=%d, cmd=0X%02X, dur=%d\n", instance, group, brightness, cmd, delayDuration);	
-				printPacket = packetPrintYes;			
-			}
+			// if (instance!=32 && instance!=43 && instance!=44 && instance!=53 && instance!=54 && instance!=55 && instance!=56) {
+			// 	printf("DC_DIMMER_COMMAND_2: inst=%d, grp=0X%02X, bright=%d, cmd=0X%02X, dur=%d\n", instance, group, brightness, cmd, delayDuration);	
+			// 	printPacket = packetPrintYes;			
+			// }
 		}
 		else if (dgn == THERMOSTAT_AMBIENT_STATUS) {
 			uint8_t instance = d[0];
@@ -1037,8 +1061,6 @@ void processPacket(CAN_frame_t *packet, uint8_t printPacket) {
 
 			printf("dgn=%05X, src=%02X, pri=%d, Data: ", dgn, sourceAddr, priority);
 
-			// printf(" from 0x%08X, DLC %d, Data ", packet->MsgID,  packet->FIR.B.DLC);
-
 			for (auto i = 0; i < packet->FIR.B.DLC; i++) {
 				printf("%02X ", packet->data.u8[i]);
 			}
@@ -1072,7 +1094,7 @@ void loop() {
 	CAN_frame_t packet;
 
 	if (xQueueReceive(CAN_cfg.rx_queue, &packet, 0) == pdTRUE) {
-		processPacket(&packet);
+		processPacket(&packet, packetPrintMode);
 	}
 
 	processPacketQueue();

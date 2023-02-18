@@ -143,6 +143,7 @@ CAN_frame_t packetQueue[sendQueueSize];
 bool packetShortGap[sendQueueSize];
 uint16_t packetQueueHead = 0;
 uint16_t packetQueueTail = 0;
+bool doCANWrite = true;
 
 void processPacketQueue() {
 	if (packetQueueHead != packetQueueTail) {
@@ -150,8 +151,13 @@ void processPacketQueue() {
 		uint32_t interval = (packetShortGap[nextIndex]) ? minSendPacketIntervalmS : sendPacketIntervalmS;
 
 		if (lastPacketSendTime >= interval) {
-			printf("%d: CAN-Bus Send Packet\n", millis());
-			ESP32Can.CANWriteFrame(&packetQueue[nextIndex]);
+			if (doCANWrite) {
+				printf("%d: CAN-Bus Send Packet\n", millis());
+				ESP32Can.CANWriteFrame(&packetQueue[nextIndex]);
+			}
+			else {
+				printf("%d: ***SIMULATE*** CAN-Bus Send Packet\n", millis());
+			}
 			packetQueueTail = nextIndex;
 			lastPacketSendTime = 0;
 		}
@@ -264,7 +270,7 @@ struct RVSwitch : SpanService {
 
 		if (_type == DimmableLamp) {
 			_brightness = new Characteristic::Brightness(HomeKitPercentMax);
-			_brightness->setRange(0, HomeKitPercentMax, 1);
+			_brightness->setRange(0, HomeKitPercentMax, 5);
 		}
 	}
 	
@@ -287,12 +293,12 @@ struct RVSwitch : SpanService {
 
 		if (index == _index && on != _on->getVal()) {
 			printf("Switch #%d: on = %d\n", _index, on);
-			_on->setVal(on, true);
+			_on->setVal(on);
 			lastPacketRecvTime = 0;
 		}
 		if (_brightness && index == _index && on && level != _brightness->getVal()) {
 			printf("Switch #%d: level = %d\n", _index, level);
-			_brightness->setVal(level, true);
+			_brightness->setVal(level);
 			lastPacketRecvTime = 0;
 		}
 	}
@@ -353,7 +359,7 @@ struct RVRoofFan : Service::Fan {
 
 		if (newState != _active->getVal()) {
 			printf("Fan #%d: active = %d\n", index, newState);
-			_active->setVal(newState, true);
+			_active->setVal(newState);
 		}
 	}
 };
@@ -425,11 +431,11 @@ struct RVHVACFan : Service::Fan {
 
 		if (newActive != _active->getVal()) {
 			printf("RVHVACFan #%d - setActive: %d\n", _index, newActive);
-			_active->setVal(newActive, true);
+			_active->setVal(newActive);
 		}
 		if (speed != _speed->getVal()) {
 			printf("RVHVACFan #%d - setSpeed: %d\n", _index, speed);
-			_speed->setVal(speed, true);
+			_speed->setVal(speed);
 		}
 	}
 
@@ -460,7 +466,7 @@ struct RVHVACFan : Service::Fan {
 
 		if (newState != _currentState->getVal()) {
 			printf("HVACFan #%d: currentState = %d\n", _index, newState);
-			_currentState->setVal(newState, true);
+			_currentState->setVal(newState);
 		}
 	}
 };
@@ -559,7 +565,7 @@ struct RVThermostat : Service::Thermostat {
 				newState = heatingCoolingStateOff;
 			}
 			if (newState != _currentState->getVal()) {
-				_currentState->setVal(newState, true);
+				_currentState->setVal(newState);
 				lastPacketRecvTime = 0;
 			}
 		}
@@ -569,7 +575,7 @@ struct RVThermostat : Service::Thermostat {
 	void setAmbientTemp(uint8_t index, double tempC) {
 		if (index == _index && fabs(tempC - _ambientTemp->getVal<double>()) > 0.2) {
 			printf("Set ambient temp #%d: %fºC\n", _index, tempC);
-			_ambientTemp->setVal(tempC, true);
+			_ambientTemp->setVal(tempC);
 			lastPacketRecvTime = 0;
 		}
 	}
@@ -582,12 +588,12 @@ struct RVThermostat : Service::Thermostat {
 
 			if (mode != _targetState->getVal()) {
 				printf("Thermostat #%d: targetState = %d\n", index, mode);
-				_targetState->setVal(mode, true);
+				_targetState->setVal(mode);
 				lastPacketRecvTime = 0;
 			}
 			if (fabs(coolTemp - _targetTemp->getVal<double>()) > 0.2) {
 				printf("Thermostat #%d: targetTemp = %f\n", index, coolTemp);
-				_targetTemp->setVal(coolTemp, true);
+				_targetTemp->setVal(coolTemp);
 				lastPacketRecvTime = 0;
 			}
 			_fan->setModeSpeed(fanMode, fanSpeed);
@@ -725,7 +731,7 @@ void cmdSetState(const char *buff) {
 	cmdSet(buff, RVCBrightMax, "cmdSetState");
 }
 
-void cmsSetAmbient(const char *buff) {
+void cmdSetAmbient(const char *buff) {
 	int16_t index;
 	int16_t tempF;
 
@@ -736,11 +742,11 @@ void cmsSetAmbient(const char *buff) {
 
 		if (index!=-1 && tempF!=-1) {
 			double tempC = (tempF - 32.0) / 1.8;
-			printf("cmsSetAmbient: index=%d, tempF=%dºF (%fºC)\n", index, tempF, tempC);
+			printf("cmdSetAmbient: index=%d, tempF=%dºF (%fºC)\n", index, tempF, tempC);
 			setAmbientTemp(index, tempC);
 		}
 		else {
-			printf("cmsSetAmbient: parameter error!\n");
+			printf("cmdSetAmbient: parameter error!\n");
 		}
 	}
 }
@@ -795,11 +801,30 @@ void cmdSendOnOff(const char *buff) {
 	}
 }
 
+void cmdSetCANWrite(const char *buff) {
+	buff++;
+	while (buff[0]==' ') buff++;
+
+	switch (buff[0]) {
+		case '0':
+			doCANWrite = false;
+			printf("CAN-Bus packet writes DISABLED.\n");
+			break;
+		case '1':
+			doCANWrite = true;
+			printf("CAN-Bus packet writes ENABLED.\n");
+			break;
+		default:
+			printf("cmdSetCANWrite: parameter error!\n");
+	}
+}
+
 void addCommands() {
 	new SpanUserCommand('l',"<index>=<level:0-250>,... - set level of <index>", cmdSetLevel);
 	new SpanUserCommand('s',"<index>=<state:0-1>,... - set state of <index>", cmdSetState);
 	new SpanUserCommand('o',"<index>=<state:0-1>,... - send onOff to <index>", cmdSendOnOff);
-	new SpanUserCommand('a',"<index>=<tempºF>,... - set ambient temp of <index>", cmsSetAmbient);
+	new SpanUserCommand('a',"<index>=<tempºF>,... - set ambient temp of <index>", cmdSetAmbient);
+	new SpanUserCommand('w',"<0-1>,... - set CAN-Bus write enable", cmdSetCANWrite);
 	new SpanUserCommand('t',"<index>=<mode:0-2>,<tempºF>,optional(<fanmode:0-1>,<fanspeed:0-250>) - set info for thermostat <index>", cmsSetThermostat);
 }
 

@@ -105,6 +105,7 @@ typedef enum {
 } FanMode;
 
 constexpr uint8_t RVCPercentMax = 250;
+constexpr uint8_t RVCBrightMax = 200;
 constexpr uint8_t HomeKitPercentMax = 100;
 
 //////////////////////////////////////////////
@@ -187,19 +188,19 @@ void sendDCDimmerCmd(uint8_t index, uint8_t brightness, uint8_t cmd, uint8_t dur
 	initPacket(&packet, index, DC_DIMMER_COMMAND_2);
 	uint8_t* d = packet.data.u8;
 
-	d[2] = brightness;
+	d[2] = min(brightness, RVCBrightMax);
 	d[3] = cmd;
 	d[4] = duration;
 	d[5] = 0;				// no interlock
 
 	queuePacket(&packet);
 
-	printf("Queueing Dimmer packet: #%d, bright=%d, cmd=%d, dur=%d\n", index, brightness, cmd, duration);
-	processPacket(&packet, packetPrintYes);
-	printf("** Packet queued.\n");
+	// printf("Queueing Dimmer packet: #%d, bright=%d, cmd=%d, dur=%d\n", index, brightness, cmd, duration);
+	// processPacket(&packet, packetPrintYes);
+	// printf("** Packet queued.\n");
 }
 
-void sendOnOff(uint8_t index, bool on, uint8_t brightness=RVCPercentMax) {
+void sendOnOff(uint8_t index, bool on, uint8_t brightness=RVCBrightMax) {
 	printf("sendOnOff: #%d to %d\n", index, on);
 	sendDCDimmerCmd(index, brightness, (on) ? DCDimmerCmdOnDuration : DCDimmerCmdOff);
 	// sendDCDimmerCmd(index, brightness, DCDimmerCmdToggle);
@@ -245,9 +246,6 @@ struct RVSwitch : SpanService {
 	uint8_t _index;
 	SwitchType _type;
 
-	int16_t _newOnVal = -1;
-	int16_t _newBrightnessVal = -1;
-
 	RVSwitch(SwitchDeviceRec *device) : SpanService( switchTypes[device->type], switchHapNames[device->type] ) {
 		_index = device->index;
 		_type = device->type;
@@ -273,7 +271,7 @@ struct RVSwitch : SpanService {
 	boolean update() {
 		if (_on->updated() || (_brightness && _brightness->updated())) {
 			if (_brightness) {
-				sendLampLevel(_index, _on->getNewVal() * _brightness->getNewVal() * RVCPercentMax / HomeKitPercentMax);
+				sendLampLevel(_index, _on->getNewVal() * _brightness->getNewVal() * RVCBrightMax / HomeKitPercentMax);
 			}
 			else {
 				sendOnOff(_index, _on->getNewVal());
@@ -282,31 +280,18 @@ struct RVSwitch : SpanService {
 		return(true);  
 	}
 
-	void loop() {
-		if (_newOnVal != -1) {
-			printf("Loop - Switch #%d: on = %d\n", index, _newOnVal);
-			_on->setVal(_newOnVal);
-			_newOnVal = -1;
-		}
-		if (_newBrightnessVal != -1) {
-			printf("Switch #%d: level = %d\n", index, _newBrightnessVal);
-			_brightness->setVal(_newBrightnessVal);
-			_newBrightnessVal = -1;
-		}
-	}
-	
 	void setLevel(uint8_t index, uint8_t dcDimmerLevel) {
 		bool on = dcDimmerLevel > 0;
-		uint16_t level = dcDimmerLevel * HomeKitPercentMax / RVCPercentMax;
+		uint16_t level = dcDimmerLevel * HomeKitPercentMax / RVCBrightMax;
 
 		if (index == _index && on != _on->getVal()) {
 			printf("Switch #%d: on = %d\n", index, on);
-			_newOnVal = on;
+			_on->setVal(on);
 			lastPacketRecvTime = 0;
 		}
 		if (_brightness && index == _index && on && level != _brightness->getVal()) {
 			printf("Switch #%d: level = %d\n", index, level);
-			_newBrightnessVal = level;
+			_brightness->setVal(level);
 			lastPacketRecvTime = 0;
 		}
 	}
@@ -320,8 +305,6 @@ struct RVRoofFan : Service::Fan {
 
 	bool _fanPower = false;
 	bool _lidUp = false;
-
-	int16_t _newActiveVal = -1;
 
 	RVRoofFan(FanDeviceRec *device) : Service::Fan() {
 		_index = device->index;
@@ -349,14 +332,6 @@ struct RVRoofFan : Service::Fan {
 		return(true);  
 	}
 	
-	void loop() {
-		if (_newActiveVal != -1) {
-			printf("Loop - Fan #%d: active = %d\n", index, _newActiveVal);
-			_active->setVal(_newActiveVal);
-			_newActiveVal = -1;
-		}
-	}
-
 	void setLevel(uint8_t index, uint8_t level) {
 		bool on = level > 0;
 
@@ -377,7 +352,7 @@ struct RVRoofFan : Service::Fan {
 
 		if (newState != _active->getVal()) {
 			printf("Fan #%d: active = %d\n", index, newState);
-			_newActiveVal = newState;
+			_active->setVal(newState);
 		}
 	}
 };
@@ -409,10 +384,6 @@ struct RVHVACFan : Service::Fan {
 	uint8_t _fanLIndex;
 	bool _fanHRunning = false;
 	bool _fanLRunning = false;
-
-	int16_t _newActiveVal = -1;
-	int16_t _newSpeedVal = -1;
-	int16_t _newCurrentStateVal = -1;
 
 	RVHVACFan(ThermostatDeviceRec *device, std::function<bool()> updateFunction) : Service::Fan() {
 		_active = new Characteristic::Active(false);
@@ -447,35 +418,17 @@ struct RVHVACFan : Service::Fan {
 		return(true);  
 	}
 
-	void loop() {
-		if (_newActiveVal != -1) {
-			printf("Loop - RVHVACFan #%d - setActive: %d\n", _index, _newActiveVal);
-			_active->setVal(_newActiveVal);
-			_newActiveVal = -1;
-		}
-		if (_newSpeedVal != -1) {
-			printf("Loop - RVHVACFan #%d - setSpeed: %d\n", _index, _newSpeedVal);
-			_speed->setVal(_newSpeedVal);
-			_newSpeedVal = -1;
-		}
-		if (_newCurrentStateVal != -1) {
-			printf("Loop - RVHVACFan #%d - currentState: %d\n", _index, _newCurrentStateVal);
-			_currentState->setVal(_newCurrentStateVal);
-			_newCurrentStateVal = -1;
-		}
-	}
-
 	void setModeSpeed(FanMode fanMode, uint8_t speed) {
 		bool newActive = fanMode == FanModeOn;
 		speed = speed * HomeKitPercentMax / RVCPercentMax;
 
 		if (newActive != _active->getVal()) {
 			printf("RVHVACFan #%d - setActive: %d\n", _index, newActive);
-			_newActiveVal = newActive;
+			_active->setVal(newActive);
 		}
 		if (speed != _speed->getVal()) {
 			printf("RVHVACFan #%d - setSpeed: %d\n", _index, speed);
-			_newSpeedVal = speed;
+			_speed->setVal(speed);
 		}
 	}
 
@@ -506,7 +459,7 @@ struct RVHVACFan : Service::Fan {
 
 		if (newState != _currentState->getVal()) {
 			printf("HVACFan #%d: currentState = %d\n", _index, newState);
-			_newCurrentStateVal = newState;
+			_currentState->setVal(newState);
 		}
 	}
 };
@@ -525,11 +478,6 @@ struct RVThermostat : Service::Thermostat {
 
 	bool _compressorRunning = false;
 	bool _furnaceRunning = false;
-
-	int16_t _newAmbientTempVal = -1;
-	int16_t _newTargetTempVal = -1;
-	int16_t _newTargetStateVal = -1;
-	int16_t _newCurrentStateVal = -1;
 
 	RVThermostat(ThermostatDeviceRec *device) : Service::Thermostat() {
 		_ambientTemp = new Characteristic::CurrentTemperature(20);
@@ -583,29 +531,6 @@ struct RVThermostat : Service::Thermostat {
 		return(true);  
 	}
 
-	void loop() {
-		if (_newAmbientTempVal != -1) {
-			printf("Loop - Set ambient temp #%d: %fºC\n", _index, _newAmbientTempVal);
-			_ambientTemp->setVal(_newAmbientTempVal);
-			_newAmbientTempVal = -1;
-		}
-		if (_newTargetTempVal != -1) {
-			printf("Loop - RVHVACFan #%d - targetTemp: %d\n", _index, _newTargetTempVal);
-			_targetTemp->setVal(_newTargetTempVal);
-			_newTargetTempVal = -1;
-		}
-		if (_newTargetStateVal != -1) {
-			printf("Loop - Thermostat #%d: targetState = %d\n", index, _newTargetStateVal);
-			_targetState->setVal(_newTargetStateVal);
-			_newTargetStateVal = -1;
-		}
-		if (_newCurrentStateVal != -1) {
-			printf("Loop - Thermostat #%d: currentState = %d\n", index, _newCurrentStateVal);
-			_currentState->setVal(_newCurrentStateVal);
-			_newCurrentStateVal = -1;
-		}
-	}
-
 	void setLevel(uint8_t index, uint8_t level) {
 		bool on = level > 0;
 		bool changed = false;
@@ -633,7 +558,7 @@ struct RVThermostat : Service::Thermostat {
 				newState = heatingCoolingStateOff;
 			}
 			if (newState != _currentState->getVal()) {
-				_newCurrentStateVal = newState;
+				_currentState->setVal(newState);
 				lastPacketRecvTime = 0;
 			}
 		}
@@ -643,7 +568,7 @@ struct RVThermostat : Service::Thermostat {
 	void setAmbientTemp(uint8_t index, double tempC) {
 		if (index == _index && fabs(tempC - _ambientTemp->getVal<double>()) > 0.2) {
 			printf("Set ambient temp #%d: %fºC\n", _index, tempC);
-			_newAmbientTempVal = tempC;
+			_ambientTemp->setVal(tempC);
 			lastPacketRecvTime = 0;
 		}
 	}
@@ -656,12 +581,12 @@ struct RVThermostat : Service::Thermostat {
 
 			if (mode != _targetState->getVal()) {
 				printf("Thermostat #%d: targetState = %d\n", index, mode);
-				_newTargetStateVal = mode;
+				_targetState->setVal(mode);
 				lastPacketRecvTime = 0;
 			}
 			if (fabs(coolTemp - _targetTemp->getVal<double>()) > 0.2) {
 				printf("Thermostat #%d: targetTemp = %f\n", index, coolTemp);
-				_newTargetTempVal = coolTemp;
+				_targetTemp->setVal(coolTemp);
 				lastPacketRecvTime = 0;
 			}
 			_fan->setModeSpeed(fanMode, fanSpeed);
@@ -796,7 +721,7 @@ void cmdSetLevel(const char *buff) {
 }
 
 void cmdSetState(const char *buff) {
-	cmdSet(buff, RVCPercentMax, "cmdSetState");
+	cmdSet(buff, RVCBrightMax, "cmdSetState");
 }
 
 void cmsSetAmbient(const char *buff) {
@@ -964,13 +889,15 @@ void processPacket(CAN_frame_t *packet, uint8_t printPacket) {
 		else if (dgn == DC_DIMMER_STATUS_3) {
 			uint8_t instance = d[0];
 			uint8_t group = d[1];
-			uint8_t brightness = d[2];
+			uint8_t brightness = min(d[2], RVCBrightMax);
 			uint8_t enable = (d[3] >> 6) & 3;
 			uint8_t delayDuration = d[4];
 			DCDimmerCmd lastCmd = (DCDimmerCmd)d[5];
 			uint8_t status = (d[6] >> 2) & 3;
 
-			// printf("DC_DIMMER_STATUS_3: inst=%d, grp=0X%02X, bright=%d, enable=%d, dur=%d, last cmd=%d, status=0X%02X\n", instance, group, brightness, enable, delayDuration, lastCmd, status);				
+			if (instance == 4) {
+				printf("DC_DIMMER_STATUS_3: inst=%d, grp=0X%02X, bright=%d, enable=%d, dur=%d, last cmd=%d, status=0X%02X\n", instance, group, brightness, enable, delayDuration, lastCmd, status);				
+			}
 			setSwitchLevel(instance, brightness);
 		}
 		else if (dgn == DC_DIMMER_COMMAND_2) {

@@ -7,7 +7,7 @@ const SwitchDeviceRec switchList[] = {
     1, DimmableLamp, "Living Room",
     2, DimmableLamp, "Hall",
     4, DimmableLamp, "Bedroom",
-    6, Lamp, "Kitchen Counter",
+    16, Lamp, "Kitchen Counter",
     17, Lamp, "Sofa",
     18, Lamp, "Bathroom",
     24, Lamp, "Cargo",

@@ -271,7 +271,8 @@ struct RVSwitch : SpanService {
 	boolean update() {
 		if (_on->updated() || (_brightness && _brightness->updated())) {
 			if (_brightness) {
-				sendLampLevel(_index, _on->getNewVal() * _brightness->getNewVal() * RVCBrightMax / HomeKitPercentMax);
+				uint16_t newLevel = _on->getNewVal() * _brightness->getNewVal() * RVCBrightMax / HomeKitPercentMax;
+				sendLampLevel(_index, newLevel);
 			}
 			else {
 				sendOnOff(_index, _on->getNewVal());
@@ -285,13 +286,13 @@ struct RVSwitch : SpanService {
 		uint16_t level = dcDimmerLevel * HomeKitPercentMax / RVCBrightMax;
 
 		if (index == _index && on != _on->getVal()) {
-			printf("Switch #%d: on = %d\n", index, on);
-			_on->setVal(on);
+			printf("Switch #%d: on = %d\n", _index, on);
+			_on->setVal(on, true);
 			lastPacketRecvTime = 0;
 		}
 		if (_brightness && index == _index && on && level != _brightness->getVal()) {
-			printf("Switch #%d: level = %d\n", index, level);
-			_brightness->setVal(level);
+			printf("Switch #%d: level = %d\n", _index, level);
+			_brightness->setVal(level, true);
 			lastPacketRecvTime = 0;
 		}
 	}
@@ -352,7 +353,7 @@ struct RVRoofFan : Service::Fan {
 
 		if (newState != _active->getVal()) {
 			printf("Fan #%d: active = %d\n", index, newState);
-			_active->setVal(newState);
+			_active->setVal(newState, true);
 		}
 	}
 };
@@ -424,11 +425,11 @@ struct RVHVACFan : Service::Fan {
 
 		if (newActive != _active->getVal()) {
 			printf("RVHVACFan #%d - setActive: %d\n", _index, newActive);
-			_active->setVal(newActive);
+			_active->setVal(newActive, true);
 		}
 		if (speed != _speed->getVal()) {
 			printf("RVHVACFan #%d - setSpeed: %d\n", _index, speed);
-			_speed->setVal(speed);
+			_speed->setVal(speed, true);
 		}
 	}
 
@@ -459,7 +460,7 @@ struct RVHVACFan : Service::Fan {
 
 		if (newState != _currentState->getVal()) {
 			printf("HVACFan #%d: currentState = %d\n", _index, newState);
-			_currentState->setVal(newState);
+			_currentState->setVal(newState, true);
 		}
 	}
 };
@@ -558,7 +559,7 @@ struct RVThermostat : Service::Thermostat {
 				newState = heatingCoolingStateOff;
 			}
 			if (newState != _currentState->getVal()) {
-				_currentState->setVal(newState);
+				_currentState->setVal(newState, true);
 				lastPacketRecvTime = 0;
 			}
 		}
@@ -568,7 +569,7 @@ struct RVThermostat : Service::Thermostat {
 	void setAmbientTemp(uint8_t index, double tempC) {
 		if (index == _index && fabs(tempC - _ambientTemp->getVal<double>()) > 0.2) {
 			printf("Set ambient temp #%d: %fºC\n", _index, tempC);
-			_ambientTemp->setVal(tempC);
+			_ambientTemp->setVal(tempC, true);
 			lastPacketRecvTime = 0;
 		}
 	}
@@ -581,12 +582,12 @@ struct RVThermostat : Service::Thermostat {
 
 			if (mode != _targetState->getVal()) {
 				printf("Thermostat #%d: targetState = %d\n", index, mode);
-				_targetState->setVal(mode);
+				_targetState->setVal(mode, true);
 				lastPacketRecvTime = 0;
 			}
 			if (fabs(coolTemp - _targetTemp->getVal<double>()) > 0.2) {
 				printf("Thermostat #%d: targetTemp = %f\n", index, coolTemp);
-				_targetTemp->setVal(coolTemp);
+				_targetTemp->setVal(coolTemp, true);
 				lastPacketRecvTime = 0;
 			}
 			_fan->setModeSpeed(fanMode, fanSpeed);
@@ -838,6 +839,12 @@ void setup() {
 	Serial.begin(115200);
 	printf("RV Bridge - Startup\n");
 
+	#ifdef OVERRIDE_MAC_ADDRESS
+ 		uint8_t newMACAddress[] = OVERRIDE_MAC_ADDRESS;
+ 		esp_base_mac_addr_set(&newMACAddress[0]);
+ 		printf("MAC address updated to: %s\n", WiFi.macAddress().c_str());
+ 	#endif
+
 	printf("Init CAN module\n");
 	CAN_cfg.speed = CAN_SPEED_250KBPS;
 	CAN_cfg.tx_pin_id = canTxPin;
@@ -895,9 +902,9 @@ void processPacket(CAN_frame_t *packet, uint8_t printPacket) {
 			DCDimmerCmd lastCmd = (DCDimmerCmd)d[5];
 			uint8_t status = (d[6] >> 2) & 3;
 
-			if (instance == 4) {
-				printf("DC_DIMMER_STATUS_3: inst=%d, grp=0X%02X, bright=%d, enable=%d, dur=%d, last cmd=%d, status=0X%02X\n", instance, group, brightness, enable, delayDuration, lastCmd, status);				
-			}
+			// if (instance == 4) {
+			// 	printf("DC_DIMMER_STATUS_3: inst=%d, grp=0X%02X, bright=%d, enable=%d, dur=%d, last cmd=%d, status=0X%02X\n", instance, group, brightness, enable, delayDuration, lastCmd, status);				
+			// }
 			setSwitchLevel(instance, brightness);
 		}
 		else if (dgn == DC_DIMMER_COMMAND_2) {

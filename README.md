@@ -130,6 +130,7 @@ The whole multiplex system connects back to a panel with outputs for all of the 
 
 Links:
 - [RV-C Organization](http://www.rv-c.com)
+- [RV-C Spec 2022-12-01](http://www.rv-c.com/sites/rv-c.com/files/RV-C%20Protocol%20FullLayer-12-01-22.pdf)
 - [SK Pang Electronics](https://www.skpang.co.uk)
 
 The docs folder contains:

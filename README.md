@@ -128,6 +128,10 @@ The whole multiplex system connects back to a panel with outputs for all of the 
 
 ## References
 
+Links:
+- [RV-C Organization](http://www.rv-c.com)
+- [SK Pang Electronics](https://www.skpang.co.uk)
+
 The docs folder contains:
 - HAP-R2.pdf - HomeKit non-commercial protocol spec R2
 - RV-C Protocol Fulllayer - RV-C protocol spec

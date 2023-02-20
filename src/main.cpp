@@ -10,7 +10,7 @@
 
 //////////////////////////////////////////////
 
-constexpr const char* versionString = "v0.1";
+constexpr const char* versionString = "v0.2";
 
 constexpr uint32_t watchDogTimerSeconds = 3;
 

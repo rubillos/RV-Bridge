@@ -11,8 +11,7 @@
 * Connects lights, fans, and thermostats to HomeKit
 * Plugs into unused CAN-Bus socket inside RV control panel.
 * STL files for 3D printed case are included.
-<br>
-<br>
+
 ---
 ## Background
 
@@ -44,14 +43,12 @@ This project is the result of putting these pieces together.
 * CAN-Bus receiving works.
 * CAN-Bus messages route correctly to HomeKit devices.
 * Correct RV-C messages are being sent over the bus.
-<br>
-<br>
+
 ---
 ## To-Do:
 
 * Verify thermostat functions.
-<br>
-<br>
+
 ---
 ## Hardware
 
@@ -63,8 +60,7 @@ You can find this on the CopperHillTech Website:<br>
 [ESP32 with WiFi, Bluetooth Classic, BLE, CAN Bus Module](https://copperhilltech.com/esp32-wifi-bluetooth-classic-ble-can-bus-module/)
 
 This board has everything needed, including a regulator for powering the device off of the 12V provided by the RV-C connector.
-<br>
-<br>
+
 ---
 ## Wiring
 
@@ -78,8 +74,7 @@ The CAN-Bus connector plugs into one of the available sockets on the system wiri
 | :---: | --- |
 | <br>![Cable Wiring](docs/images/cable.jpeg) |![Can-Bus Connector Wiring](docs/images/CAN-connector-wiring.jpg) |
 | ![G7 Panel](/docs/images/G7_panel.jpeg)<br>Available CAN-Bus sockets on G7 panel | ![spacer](/docs/images/spacer.png) |
-<br>
-<br>
+
 ---
 ## Firmware Setup
 
@@ -107,8 +102,7 @@ The CAN-Bus connector plugs into one of the available sockets on the system wiri
     * Accept that this is an "unsupported" device.
     * Add the bridge and all of your accessories, choosing appropriate rooms for them.
     * Done!
-<br>
-<br>
+
 ---
 ## Finding Output Numbers
 
@@ -133,24 +127,21 @@ The whole multiplex system connects back to a panel with outputs for all of the 
     * Layer height 0.3mm
     * Set extrusion width to 0.55 (eliminates tiny infill strips in walls)
     * Perimeter transitioning threshold angle to 20 (keeps the lettering connected)
-<br>
-<br>
+
 ---
 ## Notes
 
 - If the bridge seems to become unresponsive at some point, verify that the controlling device is on the RV's Wifi and not some other weak Wifi.
 - If the bridge doesn't seem available for pairing, it may already think it's paired. Try using the H command via the cli in the serial monitor, then reflash the ESP32 and try again.
 - If pairing fails, sometimes HomeKit gets fussy about a device changing it's properties too much an refuses to pair. You can change the MAC address of the wifi interface by defining 'OVERRIDE_MAC_ADDRESS' in config.h and re-flashing.
-<br>
-<br>
+
 ---
 ## Links:
 
 - [RV-C Organization](http://www.rv-c.com)
 - [RV-C Spec 2022-12-01](http://www.rv-c.com/sites/rv-c.com/files/RV-C%20Protocol%20FullLayer-12-01-22.pdf)
 - [SK Pang Electronics](https://www.skpang.co.uk)
-<br>
-<br>
+
 ---
 ## The docs folder contains:
 - HAP-R2.pdf - HomeKit non-commercial protocol spec R2

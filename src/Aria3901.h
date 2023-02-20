@@ -11,19 +11,16 @@ const SwitchDeviceRec switchList[] = {
     5, Lamp, "Aisle",
     6, DimmableLamp, "Bedroom Ceiling",
     7, Lamp, "Cargo",
-    // 8, Lamp, "Dinette Overhead", // Hard switch in the 3901
     9, Lamp, "Under Cabinet",
     10, Lamp, "Theater Seats",
-    // 11, Lamp, "Feature Light",  // N/A in the 3901
     12, Lamp, "Mid Bathroom Ceiling",
     13, Lamp, "Rear Bathroom Vanity?",
     14, Lamp, "Sofa",
 
-    60, Lamp, "Awning",
-
-    // PMM Outpurt 8, Switch, "Water Pump",
     17, Switch, "TV Up",
-    18, Switch, "TV Down"
+    18, Switch, "TV Down",
+
+    60, Lamp, "Awning",
 };
 
 // index, upIndex, downIndex, name

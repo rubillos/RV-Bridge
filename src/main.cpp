@@ -4,7 +4,6 @@
 #include "HomeSpan.h" 
 #include "ESP32CAN.h"
 #include "CAN_config.h"
-#include <esp_task_wdt.h>
 
 #include "config.h"
 
@@ -909,10 +908,6 @@ void setup() {
 	createDevices();
 	addCommands();
 
-	// printf("Setup Watchdog Timer\n");
-	// esp_task_wdt_init(watchDogTimerSeconds, true); //enable panic so ESP32 restarts
-	// esp_task_wdt_add(NULL); //add current thread to WDT watch
-
 	printf("Init complete.\n");
 }
 
@@ -1073,8 +1068,6 @@ void processPacket(CAN_frame_t *packet, uint8_t printPacket) {
 
 void loop() {
 	static elapsedMillis heartbeatTime;
-
-	// esp_task_wdt_reset();
 
 	bool sendIndicator = lastPacketSendTime < packetBlinkTime;
 	bool recvIndicator = lastPacketRecvTime < packetBlinkTime;

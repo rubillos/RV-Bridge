@@ -28,9 +28,9 @@ The RV's lights, fans, and climate are all controlled through a [Firefly Integra
 | ![Firefly Main](/docs/images/Firefly_main.jpeg) | ![Firefly Lights](/docs/images/Firefly_lights.jpeg) |
 | ![Firefly Climate](/docs/images/Firefly_climate.jpeg) | ![Firefly Fans](/docs/images/Firefly_fans.jpeg) |
 
-It's a great system, but the app is a bit slow to load and can only be used in proximity to the RV. I've always wondered if there was a way to control it all via HomeKit and the Home app.
+It's a great system and works really well for control around the RV, but the iOS app is a bit slow to load/connect and can only be used in proximity to the RV. I've always wondered if there was a way to control it all via HomeKit and the Home app.
 
-Recently I came across some documentation for the bus protocol that's used by the Spectrum system: it's called RV-C and is a subset of CAN-Bus, as well as the open source project [CoachProxyOS](https://github.com/linuxkidd/coachproxy-os) that documents getting a Raspberry Pi set up to host a web page for controlling an RV's network.
+Recently I came across some documentation for the bus protocol that's used by the Spectrum system, RV-C, a subset of CAN-Bus, as well as the open source project [CoachProxyOS](https://github.com/linuxkidd/coachproxy-os) that documents getting a Raspberry Pi set up to host a web page for controlling an RV's network using RV-C.
 
 I also recently started playing with [HomeSpan](https://github.com/HomeSpan/HomeSpan), a library for implementing HomeKit accessories on an ESP-32 microcontroller, for a HomeKit doorbell project.
 
@@ -43,6 +43,8 @@ This project is the result of putting these pieces together.
 * CAN-Bus receiving works.
 * CAN-Bus messages route correctly to HomeKit devices.
 * Correct RV-C messages are being sent over the bus.
+* RV devices respond correctly.
+* Lights, switches, and fans are complete.
 
 ---
 ## To-Do:
@@ -79,10 +81,10 @@ The CAN-Bus connector plugs into one of the available sockets on the system wiri
 ## Firmware Setup
 
 - Project is set up for compilation with PlatformIO
-- config.h
-    * Rename config-sample.h to config.h
+- `config.h`
+    * Rename `config-sample.h` to `config.h`.
     * Enter Wifi SSID and password for the RV network.
-    * Include a definition file for the RV devices (see Miramar32_2.h for an example)
+    * Include a definition file for the RV devices (see `Miramar32_2.h` for an example)
         * Each light will have an output number and a name, and a flag specifying if it can be dimmed.
         * Each fan has three output numbers, one for the fan power, and one each for the up and down output.
         * Each thermostat has a number, typically 0 based, an output numbers for the A/C compressor, low fan, high fan, and furnace outputs.
@@ -113,12 +115,22 @@ The whole multiplex system connects back to a panel with outputs for all of the 
 *** ***USE CAUTION WHEN ENTERING OUTPUT NUMBERS. THERE ARE OUTPUTS FOR THE RV SLIDES AND THINGS LIKE MOVEABLE BUNKS. YOU DO NOT WANT TO MISTAKENLY PICK ONE OF THOSE OUTPUTS!*** ***
 
 ---
+## Supported RV's
+
+Currently the project includes definition files for 2 RVs:
+
+`Miramar32_2.h` - 2020 Thor Miramar 32.2<br>
+`Aria3901.h` - 2019 Thor Aria 39.1
+
+Additional definition files are welcome.
+
+---
 ## 3D Printing
 
 - A case will keep the microcontroller isolated from any exposed contacts in the wiring panel.
 - STL Files are in the docs folder:
-    * ***RV-Bridge_Box_Bottom.stl***
-    * ***RV-Bridge_Box_Top.stl***
+    * `RV-Bridge_Box_Bottom.stl`
+    * `RV-Bridge_Box_Top.stl`
 - Slicer
     * Prusa Slicer 2.5.0
 - Filament

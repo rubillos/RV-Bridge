@@ -145,7 +145,7 @@ Additional definition files are welcome.
 
 - If the bridge seems to become unresponsive at some point, verify that the controlling device is on the RV's Wifi and not some other weak Wifi.
 - If the bridge doesn't seem available for pairing, it may already think it's paired. Try using the H command via the cli in the serial monitor, then reflash the ESP32 and try again.
-- If pairing fails, sometimes HomeKit gets fussy about a device changing it's properties too much an refuses to pair. You can change the MAC address of the wifi interface by defining 'OVERRIDE_MAC_ADDRESS' in config.h and re-flashing.
+- If pairing fails, sometimes HomeKit gets fussy about a device changing it's properties too much an refuses to pair. You can change the MAC address of the wifi interface by defining 'OVERRIDE_MAC_ADDRESS' in `config.h` and re-flashing.
 
 ---
 ## Links:

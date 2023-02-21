@@ -84,7 +84,7 @@ The CAN-Bus connector plugs into one of the available sockets on the system wiri
 - `config.h`
     * Rename `config-sample.h` to `config.h`.
     * Enter Wifi SSID and password for the RV network.
-    * Include a definition file for the RV devices (see `Miramar32_2.h` for an example)
+    * Include a definition file for the RV devices (see `Miramar3202.h` for an example)
         * Each light will have an output number and a name, and a flag specifying if it can be dimmed.
         * Each fan has three output numbers, one for the fan power, and one each for the up and down output.
         * Each thermostat has a number, typically 0 based, an output numbers for the A/C compressor, low fan, high fan, and furnace outputs.
@@ -119,7 +119,7 @@ The whole multiplex system connects back to a panel with outputs for all of the 
 
 Currently the project includes definition files for 2 RVs:
 
-`Miramar32_2.h` - 2020 Thor Miramar 32.2<br>
+`Miramar3202.h` - 2020 Thor Miramar 32.2<br>
 `Aria3901.h` - 2019 Thor Aria 39.1
 
 Additional definition files are welcome.

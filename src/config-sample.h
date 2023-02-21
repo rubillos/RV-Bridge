@@ -7,4 +7,4 @@ constexpr const char* sspwd = "***";
 
 constexpr uint8_t sourceAddress = 145;
 
-#include "Miramar32_2.h"
+#include "Miramar3202.h"

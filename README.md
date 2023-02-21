@@ -1,12 +1,12 @@
 # RV-Bridge: HomeKit to RV-C Bridge
 
-![RV-Bridge](/docs/images/box_wire_scale.jpeg)
+![RV-Bridge](/images/box_wire_scale.jpeg)
 
 ---
 ## Features
 
 * Connects to RV-C network in many recent model RVs
-    * (RV-C is a subset of CAN-Bus running at 250kbps)
+    * RV-C is a subset of CAN-Bus running at 250kbps
 * Uses ESP32 with a CAN-Bus interface
 * Connects lights, fans, and thermostats to HomeKit
 * Plugs into unused CAN-Bus socket inside RV control panel.
@@ -17,7 +17,7 @@
 
 At the start of the pandemic we realized that international travel was going to be off the table for a significant duration. We decided it was time to see more of the US West so we bought a class-A motorhome which we call The Penguin Express. We've put [almost 30k miles on it so far](http://rickandrandy.com/?rvlife).
 
-![Penguin Express](/docs/images/Penguin_Express.jpg)
+![Penguin Express](/images/Penguin_Express.jpg)
 
 In addition to a bunch of 3D printed upgrades (we travel with a Prusa MK3S on board) I've done some arduino powered electronics work: a water valve for a reverse osmosis water filter with an LCD control panel, a GPS based clock for the bedroom that knows the exact timezone boundaries so it never needs to be set, and a gps based altimeter and tire pressure monitor with a 7" color display for the dash.
 
@@ -25,8 +25,8 @@ The RV's lights, fans, and climate are all controlled through a [Firefly Integra
 
 |   |   |
 | --- | --- |
-| ![Firefly Main](/docs/images/Firefly_main.jpeg) | ![Firefly Lights](/docs/images/Firefly_lights.jpeg) |
-| ![Firefly Climate](/docs/images/Firefly_climate.jpeg) | ![Firefly Fans](/docs/images/Firefly_fans.jpeg) |
+| ![Firefly Main](/images/Firefly_main.jpeg) | ![Firefly Lights](/images/Firefly_lights.jpeg) |
+| ![Firefly Climate](/images/Firefly_climate.jpeg) | ![Firefly Fans](/images/Firefly_fans.jpeg) |
 
 It's a great system and works really well for control around the RV, but the iOS app is a bit slow to load/connect and can only be used in proximity to the RV. I've always wondered if there was a way to control it all via HomeKit and the Home app.
 
@@ -75,7 +75,7 @@ The CAN-Bus connector plugs into one of the available sockets on the system wiri
 |  |  |
 | :---: | --- |
 | <br>![Cable Wiring](docs/images/cable.jpeg) |![Can-Bus Connector Wiring](docs/images/CAN-connector-wiring.jpg) |
-| ![G7 Panel](/docs/images/G7_panel.jpeg)<br>Available CAN-Bus sockets on G7 panel | ![spacer](/docs/images/spacer.png) |
+| ![G7 Panel](/images/G7_panel.jpeg)<br>Available CAN-Bus sockets on G7 panel | ![spacer](/images/spacer.png) |
 
 ---
 ## Firmware Setup
@@ -99,7 +99,7 @@ The CAN-Bus connector plugs into one of the available sockets on the system wiri
     * In the Home app choose "Add Accessory".
     * Point the camera at this image:
     <br><br>
-    ![Pairing Code](/docs/images/defaultSetupCode.png)
+    ![Pairing Code](/images/defaultSetupCode.png)
     <br><br>
     * Accept that this is an "unsupported" device.
     * Add the bridge and all of your accessories, choosing appropriate rooms for them.
@@ -110,7 +110,7 @@ The CAN-Bus connector plugs into one of the available sockets on the system wiri
 
 The whole multiplex system connects back to a panel with outputs for all of the lights and fans. Each of these outputs has a unique number which may be printed on the panel's cover, and should also be found on a Network Diagnostic screen on the main LCD control screen.
 
-![G7 Outputs](/docs/images/G7_Outputs.jpeg)
+![G7 Outputs](/images/G7_Outputs.jpeg)
 
 *** ***USE CAUTION WHEN ENTERING OUTPUT NUMBERS. THERE ARE OUTPUTS FOR THE RV SLIDES AND THINGS LIKE MOVEABLE BUNKS. YOU DO NOT WANT TO MISTAKENLY PICK ONE OF THOSE OUTPUTS!*** ***
 
@@ -128,7 +128,7 @@ Additional definition files are welcome.
 ## 3D Printing
 
 - A case will keep the microcontroller isolated from any exposed contacts in the wiring panel.
-- STL Files are in the docs folder:
+- STL Files are in the `3D` folder:
     * `RV-Bridge_Box_Bottom.stl`
     * `RV-Bridge_Box_Top.stl`
 - Slicer
@@ -145,17 +145,14 @@ Additional definition files are welcome.
 
 - If the bridge seems to become unresponsive at some point, verify that the controlling device is on the RV's Wifi and not some other weak Wifi.
 - If the bridge doesn't seem available for pairing, it may already think it's paired. Try using the H command via the cli in the serial monitor, then reflash the ESP32 and try again.
-- If pairing fails, sometimes HomeKit gets fussy about a device changing it's properties too much an refuses to pair. You can change the MAC address of the wifi interface by defining 'OVERRIDE_MAC_ADDRESS' in `config.h` and re-flashing.
+- If pairing fails, it seems that sometimes HomeKit gets fussy about a device changing it's properties too much and refuses to pair. You can change the MAC address of the wifi interface by defining '`OVERRIDE_MAC_ADDRESS`' in `config.h` and re-flashing. Anecdotal evidence suggests that this can help.
 
 ---
 ## Links:
 
+- [Apple's HomeKit Accessory Protocol Specification Release R2 (HAP-R2)](https://developer.apple.com/homekit/specification/)
+    * For some reason this link appears to be broken at the moment... with a bit of hunting on the internet you can find it ;-)
 - [RV-C Organization](http://www.rv-c.com)
 - [RV-C Spec 2022-12-01](http://www.rv-c.com/sites/rv-c.com/files/RV-C%20Protocol%20FullLayer-12-01-22.pdf)
 - [SK Pang Electronics](https://www.skpang.co.uk)
-
----
-## The docs folder contains:
-- HAP-R2.pdf - HomeKit non-commercial protocol spec R2
-- RV-C Protocol Fulllayer - RV-C protocol spec
-- ESP32_CAN_revB - schematic for the CopperHillTech board.
+- [Schematic for the ESP32 CAN-Bus Board above](https://cdn.shopify.com/s/files/1/0563/2029/5107/files/ESP32_CAN_rev_B.pdf?v=1620032162)

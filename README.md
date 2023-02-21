@@ -56,7 +56,7 @@ This project is the result of putting these pieces together.
 
 Uses an ESP32 with a CAN-Bus interface, either separate components, or more easily:
 
-![ESP32 Module](docs/images/board_in_box.jpeg)
+![ESP32 Module](/images/board_in_box.jpeg)
 
 You can find this on the CopperHillTech Website:<br>
 [ESP32 with WiFi, Bluetooth Classic, BLE, CAN Bus Module](https://copperhilltech.com/esp32-wifi-bluetooth-classic-ble-can-bus-module/)
@@ -74,7 +74,7 @@ The CAN-Bus connector plugs into one of the available sockets on the system wiri
 
 |  |  |
 | :---: | --- |
-| <br>![Cable Wiring](docs/images/cable.jpeg) |![Can-Bus Connector Wiring](docs/images/CAN-connector-wiring.jpg) |
+| <br>![Cable Wiring](/images/cable.jpeg) |![Can-Bus Connector Wiring](/images/CAN-connector-wiring.jpg) |
 | ![G7 Panel](/images/G7_panel.jpeg)<br>Available CAN-Bus sockets on G7 panel | ![spacer](/images/spacer.png) |
 
 ---

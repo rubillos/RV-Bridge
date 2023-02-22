@@ -30,8 +30,7 @@
 * STL files for a 3D printed case are included.
 
 ---
-<a name="background"></a>
-## Background
+## <a name="background"></a>Background
 
 At the start of the pandemic we realized that international travel was going to be off the table for a significant duration. We decided it was time to see more of the US West so we bought a class-A motorhome which we call ***The Penguin Express***. We've put [almost 30k miles on it so far](http://rickandrandy.com/?rvlife).
 

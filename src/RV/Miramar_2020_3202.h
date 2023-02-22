@@ -45,13 +45,13 @@ const SwitchDeviceRec switchList[] = {
     23, Switch, "Water Pump"
 };
 
-// index, upIndex, downIndex, name
+// index, upIndex[or -1], downIndex[or -1], name
 const FanDeviceRec fanList[] = {
     20, 51, 52, "Kitchen",
     21, -1, -1, "Bathroom"
 };
 
-// index, compressorIndex, fanHIndex, fanLIndex, furnaceIndex, name
+// index, compressorIndex, fanHIndex, fanLIndex, furnaceIndex[or -1], name
 const ThermostatDeviceRec thermostatList[] = {
     0, 25, 26, 27, 33, "Front",
     1, 29, 30, 31, -1, "Back"

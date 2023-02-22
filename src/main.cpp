@@ -42,7 +42,7 @@
 
 //////////////////////////////////////////////
 
-constexpr const char* versionString = "v0.2";
+constexpr const char* versionString = "v0.2.0";
 
 constexpr uint8_t indicatorPinR = 2;
 constexpr uint8_t indicatorPinG = 15;

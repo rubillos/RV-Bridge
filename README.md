@@ -115,9 +115,9 @@ The CAN-Bus connector plugs into one of the available sockets inside the system 
     * Add the bridge and all of your accessories, choosing appropriate rooms and names for them.
     * Done!
 - The status LED will flash based on what the bridge is doing:
-    * <span style="color:red">Red</span> every 2 seconds as a heartbeat indicator.
-    * <span style="color:green">Green</span> when CAN-Bus packets are sent.
-    * <span style="color:blue">Blue</span> when HomeKit messages are received.
+    * 🔴 <span style="color:red">Red</span> every 2 seconds as a heartbeat indicator.
+    * 🟢 <span style="color:green">Green</span> when CAN-Bus packets are sent.
+    * 🔵 <span style="color:blue">Blue</span> when HomeKit messages are received.
 
 ---
 ## Finding Output Numbers

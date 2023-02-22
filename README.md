@@ -29,7 +29,7 @@ The RV's lights, fans, and climate are all controlled through a [Firefly Integra
 | ![Firefly Main](/images/Firefly_main.jpeg) | ![Firefly Lights](/images/Firefly_lights.jpeg) |
 | ![Firefly Climate](/images/Firefly_climate.jpeg) | ![Firefly Fans](/images/Firefly_fans.jpeg) |
 
-It's a great system and works really well for control around the RV, but the iOS app is a bit slow to load/connect and can only be used in proximity to the RV. I've always wondered if there was a way to control it all via HomeKit and the Home app.
+It's a great system and works really well for control of the RV devices, but the iOS app is a bit slow to load/connect and can only be used in proximity to the RV. I've always wondered if there was a way to control it all via HomeKit and the Home app.
 
 Recently I came across some documentation for the bus protocol that's used by the Spectrum system, RV-C, a subset of CAN-Bus, as well as the open source project [CoachProxyOS](https://github.com/linuxkidd/coachproxy-os) that documents getting a Raspberry Pi set up to host a web page for controlling an RV's network using RV-C.
 
@@ -83,7 +83,8 @@ The CAN-Bus connector plugs into one of the available sockets inside the system 
 ## Firmware Setup
 
 - The project is set up for compilation with PlatformIO.
-- You can also use the Arduino IDE. You'll need to install the following libraries:
+    * I use it via Microsoft's Visual Studio Code.
+- Pretty sure you could also use the Arduino IDE. You'd need to install the following libraries:
     * elapsedMillis
     * miwagner/ESP32CAN
     * homespan/HomeSpan
@@ -91,9 +92,9 @@ The CAN-Bus connector plugs into one of the available sockets inside the system 
     * Rename `config-sample.h` to `config.h`.
     * Enter Wifi SSID and password for your RV network.
     * Include a definition file for your RV devices (see `Miramar_2020_3202.h` for an example).
-        * Each light will have an output number, a name, and a flag specifying if it can be dimmed.
-        * Each fan has three output numbers, one for the fan power, and one each for the up and down outputs, which are optional, -1 if not present.
-        * Each thermostat has a number, typically 0 based, and output numbers for the A/C compressor, low fan, high fan, and a furnace output, which is optional, -1 if not present.
+        * Each light will have an output number, a flag specifying if it can be dimmed, and a name.
+        * Each fan has three output numbers, one for the fan power, and one each for the up and down outputs, which are optional (-1 if not present), and a name.
+        * Each thermostat has an ID number, typically 0 based, and output numbers for the A/C compressor, low fan, high fan, and a furnace output, which is optional (-1 if not present), and a name.
         * See "Finding Output Numbers" below for details on output numbers.
 - Flashing
     * If you are using an ESP32 with a USB-C connector and flashing from a Mac, you may need to connect it via a USB hub due to some timing weirdness around resetting the ESP32 into boot mode. I use a USB-C to 4 port USB-A hub with a USB-A to USB-C cable.
@@ -113,6 +114,10 @@ The CAN-Bus connector plugs into one of the available sockets inside the system 
     * Accept that this is an "unsupported" device.
     * Add the bridge and all of your accessories, choosing appropriate rooms and names for them.
     * Done!
+- The status LED will flash based on what the bridge is doing:
+    * <span style="color:red">Red</span> every 2 seconds as a heartbeat indicator.
+    * <span style="color:green">Green</span> when CAN-Bus packets are sent.
+    * <span style="color:blue">Blue</span> when HomeKit messages are received.
 
 ---
 ## Finding Output Numbers

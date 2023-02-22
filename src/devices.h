@@ -37,24 +37,24 @@ typedef enum {
 } SwitchType;
 
 typedef struct {
-    uint8_t index;
+    int16_t index;
     SwitchType type;
     const char* name;
 } SwitchDeviceRec;
 
 typedef struct {
-    uint8_t index;
-    int8_t upIndex;
-    int8_t downIndex;
+    int16_t index;
+    int16_t upIndex;
+    int16_t downIndex;
     const char* name;
 } FanDeviceRec;
 
 typedef struct {
-    uint8_t index;
-    uint8_t compressorIndex;
-    uint8_t fanHIndex;
-    uint8_t fanLIndex;
-    int8_t furnaceIndex;
+    int16_t index;
+    int16_t compressorIndex;
+    int16_t fanHIndex;
+    int16_t fanLIndex;
+    int16_t furnaceIndex;
     const char* name;
 } ThermostatDeviceRec;
 

@@ -280,17 +280,15 @@ const char* switchHapNames[3] = { "LightBulb", "LightBulb", "Switch" };
 struct RVSwitch : SpanService {
 	SpanCharacteristic *_on;
 	SpanCharacteristic *_brightness = NULL;
-	uint8_t _index;
-	SwitchType _type;
+	int16_t _index;
 
 	RVSwitch(SwitchDeviceRec *device) : SpanService( switchTypes[device->type], switchHapNames[device->type] ) {
 		_index = device->index;
-		_type = device->type;
 
 		REQ(On);
 		OPT(Name);
 
-		if (_type == Lamp || _type == DimmableLamp) {
+		if (device->type == Lamp || device->type == DimmableLamp) {
 			OPT(Brightness);
 			OPT(Hue);
 			OPT(Saturation);
@@ -299,7 +297,7 @@ struct RVSwitch : SpanService {
 
 		_on = new Characteristic::On();
 
-		if (_type == DimmableLamp) {
+		if (device->type == DimmableLamp) {
 			_brightness = new Characteristic::Brightness(HomeKitPercentMax);
 			_brightness->setRange(0, HomeKitPercentMax, 5);
 		}
@@ -337,9 +335,9 @@ struct RVSwitch : SpanService {
 
 struct RVRoofFan : Service::Fan {
 	SpanCharacteristic *_active;
-	uint8_t _index;
-	uint8_t _upIndex;
-	uint8_t _downIndex;
+	int16_t _index;
+	int16_t _upIndex;
+	int16_t _downIndex;
 
 	bool _fanPower = false;
 	bool _lidUp = false;
@@ -417,9 +415,9 @@ struct RVHVACFan : Service::Fan {
 	
 	std::function<bool()> _updateFunction;
 
-	uint8_t _index;
-	uint8_t _fanHIndex;
-	uint8_t _fanLIndex;
+	int16_t _index;
+	int16_t _fanHIndex;
+	int16_t _fanLIndex;
 	bool _fanHRunning = false;
 	bool _fanLRunning = false;
 
@@ -510,9 +508,9 @@ struct RVThermostat : Service::Thermostat {
 
 	RVHVACFan *_fan;
 
-	uint8_t _index;
-	uint8_t _compressorIndex;
-	uint8_t _furnaceIndex;
+	int16_t _index;
+	int16_t _compressorIndex;
+	int16_t _furnaceIndex;
 
 	bool _compressorRunning = false;
 	bool _furnaceRunning = false;

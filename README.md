@@ -3,7 +3,22 @@
 ![RV-Bridge](/images/box_wire_scale.jpeg)
 
 ---
-## Features
+
+1. [Features](#features)
+2. [Background](#background)
+3. [Current Project State](#state)
+4. [To-Do](#todo)
+5. [Hardware](#hardware)
+6. [Wiring](#wiring)
+7. [Firmware Setup](#firmware)
+8. [Finding Output Numbers](#outputs)
+9. [Supported RVs](#rvs)
+10. [3D Printing](#3dprint)
+11. [Notes and Tips](#notes)
+12. [Links](#links)
+
+---
+## Features <a name="features"></a>
 
 * Connects to the RV-C network in many modern RVs.
     * RV-C is a subset of CAN-Bus running at 250kbps.
@@ -14,7 +29,7 @@
 * STL files for a 3D printed case are included.
 
 ---
-## Background
+## Background <a name="background"></a>
 
 At the start of the pandemic we realized that international travel was going to be off the table for a significant duration. We decided it was time to see more of the US West so we bought a class-A motorhome which we call ***The Penguin Express***. We've put [almost 30k miles on it so far](http://rickandrandy.com/?rvlife).
 
@@ -38,7 +53,7 @@ I also recently started playing with [HomeSpan](https://github.com/HomeSpan/Home
 RV-Bridge is the result of putting these pieces together.
 
 ---
-## Current Project State (v0.2.0)
+## Current Project State (v0.2.0) <a name="state"></a>
 
 * Homespan pairing works, devices show up in the Home app.
 * CAN-Bus packet receiving works.
@@ -49,12 +64,12 @@ RV-Bridge is the result of putting these pieces together.
 * The temperature readings from thermostats are reflected in the Home app.
 
 ---
-## To-Do:
+## To-Do: <a name="todo"></a>
 
 * Thermostat setting functions.
 
 ---
-## Hardware
+## Hardware <a name="hardware"></a>
 
 Uses an ESP32 with a CAN-Bus interface, either as separate components, or more easily, this board from [skpang.co.uk](https://www.skpang.co.uk):
 
@@ -66,7 +81,7 @@ In the U.S. you can find it on the CopperHillTech Website:<br>
 This board has everything needed, including a regulator for powering the device off of the 12V provided by the RV-C connector.
 
 ---
-## Wiring
+## Wiring <a name="wiring"></a>
 
 The connector used by the Firefly system is a ***3M 37104-A165-00E MB*** which can be sourced from [Digikey](https://www.digikey.com/en/products/detail/3m/37104-A165-00E%2520MB/1855697)
 
@@ -80,7 +95,7 @@ The CAN-Bus connector plugs into one of the available sockets inside the system 
 | ![G7 Panel](/images/G7_panel.jpeg) | ![Home App](/images/Home_App.PNG) |
 
 ---
-## Firmware Setup
+## Firmware Setup <a name="firmware"></a>
 
 - The project is set up for compilation with PlatformIO.
     * I use it via Microsoft's Visual Studio Code.
@@ -92,10 +107,23 @@ The CAN-Bus connector plugs into one of the available sockets inside the system 
     * Rename `config-sample.h` to `config.h`.
     * Enter Wifi SSID and password for your RV network.
     * Include a definition file for your RV devices (see `Miramar_2020_3202.h` for an example).
-        * Each light will have an output number, a flag specifying if it can be dimmed, and a name.
-        * Each fan has three output numbers, one for the fan power, and one each for the up and down outputs, which are optional (-1 if not present), and a name.
-        * Each thermostat has an ID number, typically 0 based, and output numbers for the A/C compressor, low fan, high fan, and a furnace output, which is optional (-1 if not present), and a name.
-        * See "Finding Output Numbers" below for details on output numbers.
+        * Each switch has:
+            * Output number.
+            * Type: Lamp, DimmableLamp, or Switch.
+            * Name.
+        * Each fan has:
+            * Output number for fan power.
+            * Output number for up - optional, -1 if not used.
+            * Output number for down - optional, -1 if not used.
+            * Name.
+        * Each thermostat has:
+            * ID number, typically 0 based.
+            * Output number for the A/C compressor.
+            * Output number for low fan.
+            * Output number for high fan.
+            * Output number for furnace - optional, -1 if not present.
+            * Name.
+        * See [Finding Output Numbers](#outputs) below for details on output numbers.
 - Flashing
     * If you are using an ESP32 with a USB-C connector and flashing from a Mac, you may need to connect it via a USB hub due to some timing weirdness around resetting the ESP32 into boot mode. I use a USB-C to 4 port USB-A hub with a USB-A to USB-C cable.
 - Startup
@@ -120,7 +148,7 @@ The CAN-Bus connector plugs into one of the available sockets inside the system 
     * 🔵 <span style="color:blue">Blue</span> when HomeKit messages are received.
 
 ---
-## Finding Output Numbers
+## Finding Output Numbers <a name="outputs"></a>
 
 The whole multiplex system connects back to a panel with outputs for all of the lights and fans. Each of these outputs has a unique number which may be printed on the panel's cover, and should also be found on a Network Diagnostic screen on the main LCD control screen.
 
@@ -129,7 +157,7 @@ The whole multiplex system connects back to a panel with outputs for all of the 
 *** ***USE EXTREME CAUTION WHEN ENTERING OUTPUT NUMBERS. THERE ARE OUTPUTS FOR THE RV SLIDES AND THINGS LIKE MOVEABLE BUNKS. YOU DO NOT WANT TO MISTAKENLY PICK ONE OF THOSE OUTPUTS FOR A LIGHT OR FAN!*** ***
 
 ---
-## Supported RV's
+## Supported RV's <a name="rvs"></a>
 
 Currently the project includes definition files for these RVs in the `RV` folder:
 
@@ -139,7 +167,7 @@ Currently the project includes definition files for these RVs in the `RV` folder
 (Additional definition files are welcome!)
 
 ---
-## 3D Printing
+## 3D Printing <a name="3dprint"></a>
 
 - A case will keep the microcontroller isolated from any exposed contacts inside the wiring panel.
 - STL Files are in the `3D` folder:
@@ -155,14 +183,14 @@ Currently the project includes definition files for these RVs in the `RV` folder
     * `Perimeter Transitioning Threshold Angle` to 20 (keeps the lettering connected).
 
 ---
-## Notes and Tips
+## Notes and Tips <a name="notes"></a>
 
 - If the bridge seems to become unresponsive at some point, verify that the controlling device is on the RV's Wifi and not some other weak Wifi.
 - If the bridge doesn't seem available for pairing, it may already think it's paired. Try using the H command via the cli in the serial monitor, then reflash the ESP32 and try again.
 - If pairing fails, it seems that sometimes HomeKit gets fussy about a device changing it's properties too much and refuses to pair. You can change the MAC address of the wifi interface on the ESP32 by defining `OVERRIDE_MAC_ADDRESS` in `config.h` and re-flashing. Anecdotal evidence suggests that this can help.
 
 ---
-## Links:
+## Links: <a name="links"></a>
 
 - [Apple's HomeKit Accessory Protocol Specification Release R2 (HAP-R2)](https://developer.apple.com/homekit/specification/)
     * For some reason this link appears to be broken on the Apple side at the moment... with _just a tiny bit_ of hunting on the internet you can find it 😉

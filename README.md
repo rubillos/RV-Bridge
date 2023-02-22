@@ -18,8 +18,7 @@
 12. [Links](#links)
 
 ---
-<a name="features"></a>
-## Features
+## <a name="features"></a>Features
 
 * Connects to the RV-C network in many modern RVs.
     * RV-C is a subset of CAN-Bus running at 250kbps.
@@ -54,8 +53,7 @@ I also recently started playing with [HomeSpan](https://github.com/HomeSpan/Home
 RV-Bridge is the result of putting these pieces together.
 
 ---
-<a name="state"></a>
-## Current Project State (v0.2.0)
+## <a name="state"></a>Current Project State (v0.2.0)
 
 * Homespan pairing works, devices show up in the Home app.
 * CAN-Bus packet receiving works.
@@ -66,14 +64,12 @@ RV-Bridge is the result of putting these pieces together.
 * The temperature readings from thermostats are reflected in the Home app.
 
 ---
-<a name="todo"></a>
-## To-Do:
+## <a name="todo"></a>To-Do:
 
 * Thermostat setting functions.
 
 ---
-<a name="hardware"></a>
-## Hardware
+## <a name="hardware"></a>Hardware
 
 Uses an ESP32 with a CAN-Bus interface, either as separate components, or more easily, this board from [skpang.co.uk](https://www.skpang.co.uk):
 
@@ -85,8 +81,7 @@ In the U.S. you can find it on the CopperHillTech Website:<br>
 This board has everything needed, including a regulator for powering the device off of the 12V provided by the RV-C connector.
 
 ---
-<a name="wiring"></a>
-## Wiring
+## <a name="wiring"></a>Wiring
 
 The connector used by the Firefly system is a ***3M 37104-A165-00E MB*** which can be sourced from [Digikey](https://www.digikey.com/en/products/detail/3m/37104-A165-00E%2520MB/1855697)
 
@@ -100,8 +95,7 @@ The CAN-Bus connector plugs into one of the available sockets inside the system 
 | ![G7 Panel](/images/G7_panel.jpeg) | ![Home App](/images/Home_App.PNG) |
 
 ---
-<a name="firmware"></a>
-## Firmware Setup
+## <a name="firmware"></a>Firmware Setup
 
 - The project is set up for compilation with PlatformIO.
     * I use it via Microsoft's Visual Studio Code.
@@ -154,8 +148,7 @@ The CAN-Bus connector plugs into one of the available sockets inside the system 
     * 🔵 <span style="color:blue">Blue</span> when HomeKit messages are received.
 
 ---
-<a name="outputs"></a>
-## Finding Output Numbers
+## <a name="outputs"></a>Finding Output Numbers
 
 The whole multiplex system connects back to a panel with outputs for all of the lights and fans. Each of these outputs has a unique number which may be printed on the panel's cover, and should also be found on a Network Diagnostic screen on the main LCD control screen.
 
@@ -164,8 +157,7 @@ The whole multiplex system connects back to a panel with outputs for all of the 
 *** ***USE EXTREME CAUTION WHEN ENTERING OUTPUT NUMBERS. THERE ARE OUTPUTS FOR THE RV SLIDES AND THINGS LIKE MOVEABLE BUNKS. YOU DO NOT WANT TO MISTAKENLY PICK ONE OF THOSE OUTPUTS FOR A LIGHT OR FAN!*** ***
 
 ---
-<a name="rvs"></a>
-## Supported RV's
+## <a name="rvs"></a>Supported RV's
 
 Currently the project includes definition files for these RVs in the `RV` folder:
 
@@ -175,8 +167,7 @@ Currently the project includes definition files for these RVs in the `RV` folder
 (Additional definition files are welcome!)
 
 ---
-<a name="3dprint"></a>
-## 3D Printing
+## <a name="3dprint"></a>3D Printing
 
 - A case will keep the microcontroller isolated from any exposed contacts inside the wiring panel.
 - STL Files are in the `3D` folder:
@@ -192,16 +183,14 @@ Currently the project includes definition files for these RVs in the `RV` folder
     * `Perimeter Transitioning Threshold Angle` to 20 (keeps the lettering connected).
 
 ---
-<a name="notes"></a>
-## Notes and Tips
+## <a name="notes"></a>Notes and Tips
 
 - If the bridge seems to become unresponsive at some point, verify that the controlling device is on the RV's Wifi and not some other weak Wifi.
 - If the bridge doesn't seem available for pairing, it may already think it's paired. Try using the H command via the cli in the serial monitor, then reflash the ESP32 and try again.
 - If pairing fails, it seems that sometimes HomeKit gets fussy about a device changing it's properties too much and refuses to pair. You can change the MAC address of the wifi interface on the ESP32 by defining `OVERRIDE_MAC_ADDRESS` in `config.h` and re-flashing. Anecdotal evidence suggests that this can help.
 
 ---
-<a name="links"></a>
-## Links:
+## <a name="links"></a>Links:
 
 - [Apple's HomeKit Accessory Protocol Specification Release R2 (HAP-R2)](https://developer.apple.com/homekit/specification/)
     * For some reason this link appears to be broken on the Apple side at the moment... with _just a tiny bit_ of hunting on the internet you can find it 😉

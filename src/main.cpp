@@ -232,13 +232,13 @@ void sendDCDimmerCmd(uint8_t index, uint8_t brightness, uint8_t cmd, uint8_t dur
 
 	queuePacket(&packet);
 
-	// printf("Queueing Dimmer packet: #%d, bright=%d, cmd=%d, dur=%d\n", index, brightness, cmd, duration);
+	// printf("%d: Queueing Dimmer packet: #%d, bright=%d, cmd=%d, dur=%d\n", millis(), index, brightness, cmd, duration);
 	// processPacket(&packet, packetPrintYes);
-	// printf("** Packet queued.\n");
+	// printf("%d: ** Packet queued.\n", millis());
 }
 
 void sendOnOff(uint8_t index, bool on, uint8_t brightness=RVCBrightMax) {
-	printf("sendOnOff: #%d to %d\n", index, on);
+	printf("%d: sendOnOff: #%d to %d\n", millis(), index, on);
 	sendDCDimmerCmd(index, brightness, (on) ? DCDimmerCmdOnDuration : DCDimmerCmdOff);
 	// sendDCDimmerCmd(index, brightness, DCDimmerCmdToggle);
 }
@@ -248,7 +248,7 @@ void sendLampLevel(uint8_t index, uint8_t brightness) {
 		sendOnOff(index, false);
 	}
 	else {
-		printf("sendLampLevel: #%d to %d\n", index, brightness);
+		printf("%d: sendLampLevel: #%d to %d\n", millis(), index, brightness);
 		sendDCDimmerCmd(index, brightness, DCDimmerCmdSetBrightness, 0);
 	}
 }
@@ -267,9 +267,9 @@ void sendThermostatCommand(uint8_t index, ThermostatMode mode, FanMode fanMode, 
 
 	queuePacket(&packet);
 
-	// printf("Queueing Thermostat packet: #%d, mode=%d, fanMode=%d, temp=%fºC\n", index, mode, fanMode, tempC);
+	// printf("%d: Queueing Thermostat packet: #%d, mode=%d, fanMode=%d, temp=%fºC\n", millis(), index, mode, fanMode, tempC);
 	// processPacket(&packet, packetPrintIfUnknown);
-	// printf("** Packet queued.\n");
+	// printf("%d: ** Packet queued.\n", millis());
 }
 
 //////////////////////////////////////////////
@@ -321,12 +321,12 @@ struct RVSwitch : SpanService {
 		uint16_t level = dcDimmerLevel * HomeKitPercentMax / RVCBrightMax;
 
 		if (index == _index && on != _on->getVal()) {
-			printf("Switch #%d: on = %d\n", _index, on);
+			printf("%d: Switch #%d: on = %d\n", millis(), _index, on);
 			_on->setVal(on);
 			lastPacketRecvTime = 0;
 		}
 		if (_brightness && index == _index && on && level != _brightness->getVal()) {
-			printf("Switch #%d: level = %d\n", _index, level);
+			printf("%d: Switch #%d: level = %d\n", millis(), _index, level);
 			_brightness->setVal(level);
 			lastPacketRecvTime = 0;
 		}
@@ -387,7 +387,7 @@ struct RVRoofFan : Service::Fan {
 		bool newState = _fanPower && (_upIndex==-1 || _lidUp);
 
 		if (newState != _active->getVal()) {
-			printf("Fan #%d: active = %d\n", index, newState);
+			printf("%d: Fan #%d: active = %d\n", millis(), index, newState);
 			_active->setVal(newState);
 		}
 	}
@@ -438,15 +438,15 @@ struct RVHVACFan : Service::Fan {
 		bool changed = false;
 
 		if (_active->updated()) {
-			printf("RVHVACFan #%d - Active: %d\n", _index, _active->getNewVal());
+			printf("%d: RVHVACFan #%d - Active: %d\n", millis(), _index, _active->getNewVal());
 			changed = true;
 		}
 		if (_speed->updated()) {
-			printf("RVHVACFan #%d - Speed: %d\n", _index, _speed->getNewVal());
+			printf("%d: RVHVACFan #%d - Speed: %d\n", millis(), _index, _speed->getNewVal());
 			changed = true;
 		}
 		if (_targetState->updated()) {
-			printf("RVHVACFan #%d - Target State: %d\n", _index, _targetState->getNewVal());
+			printf("%d: RVHVACFan #%d - Target State: %d\n", millis(), _index, _targetState->getNewVal());
 		}
 		if (changed) {
 			_updateFunction();
@@ -459,11 +459,11 @@ struct RVHVACFan : Service::Fan {
 		speed = speed * HomeKitPercentMax / RVCPercentMax;
 
 		if (newActive != _active->getVal()) {
-			printf("RVHVACFan #%d - setActive: %d\n", _index, newActive);
+			printf("%d: RVHVACFan #%d - setActive: %d\n", millis(), _index, newActive);
 			_active->setVal(newActive);
 		}
 		if (speed != _speed->getVal()) {
-			printf("RVHVACFan #%d - setSpeed: %d\n", _index, speed);
+			printf("%d: RVHVACFan #%d - setSpeed: %d\n", millis(), _index, speed);
 			_speed->setVal(speed);
 		}
 	}
@@ -494,7 +494,7 @@ struct RVHVACFan : Service::Fan {
 		uint8_t newState = (_fanHRunning || _fanLRunning) ? currentFanStateBlowing : currentFanStateIdle;
 
 		if (newState != _currentState->getVal()) {
-			printf("HVACFan #%d: currentState = %d\n", _index, newState);
+			printf("%d: HVACFan #%d: currentState = %d\n", millis(), _index, newState);
 			_currentState->setVal(newState);
 		}
 	}
@@ -538,7 +538,7 @@ struct RVThermostat : Service::Thermostat {
 	}
 
 	void updateThermostat() {
-		printf("Thermostat #%d: Send thermostat info\n", _index);
+		printf("%d: Thermostat #%d: Send thermostat info\n", millis(), _index);
 		ThermostatMode modeLookup[] { ThermostatModeOff, ThermostatModeHeat, ThermostatModeCool };
 		ThermostatMode opMode = modeLookup[_targetState->getNewVal()];
 		FanMode fanMode;
@@ -553,11 +553,11 @@ struct RVThermostat : Service::Thermostat {
 		bool sendInfo = false;
 
 		if (_targetState->updated()) {
-			printf("RVThermostat #%d, Target State: %d\n", _index, _targetState->getNewVal());
+			printf("%d: RVThermostat #%d, Target State: %d\n", millis(), _index, _targetState->getNewVal());
 			sendInfo = true;
 		}
 		if (_targetTemp->updated()) {
-			printf("RVThermostat #%d - Target Temp: %f\n", _index, _targetTemp->getNewVal<double>());
+			printf("%d: RVThermostat #%d - Target Temp: %f\n", millis(), _index, _targetTemp->getNewVal<double>());
 			sendInfo = true;
 		}
 		if (sendInfo) {
@@ -572,12 +572,12 @@ struct RVThermostat : Service::Thermostat {
 		bool changed = false;
 
 		if (index == _compressorIndex && on != _compressorRunning) {
-			printf("Thermostat #%d: compressor = %d\n", index, on);
+			printf("%d: Thermostat #%d: compressor = %d\n", millis(), index, on);
 			_compressorRunning = on;
 			changed = true;
 		}
 		if (index == _furnaceIndex && on != _furnaceRunning) {
-			printf("Thermostat #%d: furnace = %d\n", index, on);
+			printf("%d: Thermostat #%d: furnace = %d\n", millis(), index, on);
 			_furnaceRunning = on;
 			changed = true;
 		}
@@ -603,7 +603,7 @@ struct RVThermostat : Service::Thermostat {
 
 	void setAmbientTemp(uint8_t index, double tempC) {
 		if (index == _index && fabs(tempC - _ambientTemp->getVal<double>()) > 0.2) {
-			printf("Set ambient temp #%d: %fºC\n", _index, tempC);
+			printf("%d: Set ambient temp #%d: %fºC\n", millis(), _index, tempC);
 			_ambientTemp->setVal(tempC);
 			lastPacketRecvTime = 0;
 		}
@@ -616,12 +616,12 @@ struct RVThermostat : Service::Thermostat {
 			uint8_t newFan = fanMode == FanModeOn;
 
 			if (mode != _targetState->getVal()) {
-				printf("Thermostat #%d: targetState = %d\n", index, mode);
+				printf("%d: Thermostat #%d: targetState = %d\n", millis(), index, mode);
 				_targetState->setVal(mode);
 				lastPacketRecvTime = 0;
 			}
 			if (fabs(coolTemp - _targetTemp->getVal<double>()) > 0.2) {
-				printf("Thermostat #%d: targetTemp = %f\n", index, coolTemp);
+				printf("%d: Thermostat #%d: targetTemp = %f\n", millis(), index, coolTemp);
 				_targetTemp->setVal(coolTemp);
 				lastPacketRecvTime = 0;
 			}
@@ -675,19 +675,19 @@ void createDevices() {
 
 		const char* typeNames[] = { "Lamp", "Dimmable", "Switch" };
 		for (SwitchDeviceRec device : switchList) {
-			printf("Creating %s #%d: \"%s\"\n", typeNames[device.type], device.index, device.name);
+			printf("%d: Creating %s #%d: \"%s\"\n", millis(), typeNames[device.type], device.index, device.name);
 			SPAN_ACCESSORY(device.name);
 				switches[switchCount++] = new RVSwitch(&device);
 		}
 
 		for (FanDeviceRec fan : fanList) {
-			printf("Creating Fan #%d: \"%s\"\n", fan.index, fan.name);
+			printf("%d: Creating Fan #%d: \"%s\"\n", millis(), fan.index, fan.name);
 			SPAN_ACCESSORY(fan.name);
 				fans[fanCount++] = new RVRoofFan(&fan);
 		}
 
 		for (ThermostatDeviceRec thermostat : thermostatList) {
-			printf("Creating Thermostat #%d: \"%s\"\n", thermostat.index, thermostat.name);
+			printf("%d: Creating Thermostat #%d: \"%s\"\n", millis(), thermostat.index, thermostat.name);
 			SPAN_ACCESSORY(thermostat.name);
 				thermostats[thermostatCount++] = new RVThermostat(&thermostat);
 		}
@@ -743,11 +743,11 @@ void cmdSet(const char *buff, uint8_t multiplier, const char* label) {
 		buff = getValuePair(buff, &index, &val);
 
 		if (index!=-1 && val!=-1) {
-			printf("%s: index=%d, val=%d\n", label, index, val);
+			printf("%d: %s: index=%d, val=%d\n", millis(), label, index, val);
 			setSwitchLevel(index, val*multiplier);
 		}
 		else {
-			printf("%s: parameter error!\n", label);
+			printf("%d: %s: parameter error!\n", millis(), label);
 		}
 	}
 }
@@ -771,11 +771,11 @@ void cmdSetAmbient(const char *buff) {
 
 		if (index!=-1 && tempF!=-1) {
 			double tempC = (tempF - 32.0) / 1.8;
-			printf("cmdSetAmbient: index=%d, tempF=%dºF (%fºC)\n", index, tempF, tempC);
+			printf("%d: cmdSetAmbient: index=%d, tempF=%dºF (%fºC)\n", millis(), index, tempF, tempC);
 			setAmbientTemp(index, tempC);
 		}
 		else {
-			printf("cmdSetAmbient: parameter error!\n");
+			printf("%d: cmdSetAmbient: parameter error!\n", millis());
 		}
 	}
 }
@@ -803,11 +803,11 @@ void cmsSetThermostat(const char *buff) {
 
 	if (index!=-1 && opMode!=-1 && fanMode!=-1 && fanSpeed!=-1 && tempF!=-1) {
 		double tempC = (tempF - 32.0) / 1.8;
-		printf("cmsSetThermostat: index=%d, mode=%d, temp=%dºF (%fºC), fanMode=%d, fanSpeed=%d\n", index, opMode, tempF, tempC, fanMode, fanSpeed);
+		printf("%d: cmsSetThermostat: index=%d, mode=%d, temp=%dºF (%fºC), fanMode=%d, fanSpeed=%d\n", millis(), index, opMode, tempF, tempC, fanMode, fanSpeed);
 		setThermostatInfo(index, (ThermostatMode)opMode, (FanMode)fanMode, fanSpeed, tempC, tempC);
 	}
 	else {
-		printf("cmsSetThermostat: parameter error!\n");
+		printf("%d: cmsSetThermostat: parameter error!\n", millis());
 	}
 }
 
@@ -821,11 +821,11 @@ void cmdSendOnOff(const char *buff) {
 		buff = getValuePair(buff, &index, &val);
 
 		if (index!=-1 && val!=-1) {
-			printf("cmdSendOnOff: index=%d, val=%d\n", index, val);
+			printf("%d: cmdSendOnOff: index=%d, val=%d\n", millis(), index, val);
 			sendOnOff(index, val);
 		}
 		else {
-			printf("cmdSendOnOff: parameter error!\n");
+			printf("%d: cmdSendOnOff: parameter error!\n", millis());
 		}
 	}
 }
@@ -837,14 +837,14 @@ void cmdSetCANWrite(const char *buff) {
 	switch (buff[0]) {
 		case '0':
 			doCANWrite = false;
-			printf("CAN-Bus packet writes DISABLED.\n");
+			printf("%d: CAN-Bus packet writes DISABLED.\n", millis());
 			break;
 		case '1':
 			doCANWrite = true;
-			printf("CAN-Bus packet writes ENABLED.\n");
+			printf("%d: CAN-Bus packet writes ENABLED.\n", millis());
 			break;
 		default:
-			printf("cmdSetCANWrite: parameter error!\n");
+			printf("%d: cmdSetCANWrite: parameter error!\n", millis());
 	}
 }
 
@@ -855,18 +855,18 @@ void cmdSetPacketLog(const char *buff) {
 	switch (buff[0]) {
 		case '0':
 			packetPrintMode = packetPrintNo;
-			printf("Packet logging: Off.\n");
+			printf("%d: Packet logging: Off.\n", millis());
 			break;
 		case '1':
 			packetPrintMode = packetPrintYes;
-			printf("Packet logging: On.\n");
+			printf("%d: Packet logging: On.\n", millis());
 			break;
 		case '2':
 			packetPrintMode = packetPrintIfUnknown;
-			printf("Packet logging: If Unknown.\n");
+			printf("%d: Packet logging: If Unknown.\n", millis());
 			break;
 		default:
-			printf("cmdSetPacketLog: parameter error!\n");
+			printf("%d: cmdSetPacketLog: parameter error!\n", millis());
 	}
 }
 
@@ -914,22 +914,22 @@ void setup() {
 	flashPin(indicatorPinR, 20, 200);
 
 	Serial.begin(115200);
-	printf("RV Bridge - Startup\n");
+	printf("%d: RV Bridge - Startup\n", millis());
 
 	#ifdef OVERRIDE_MAC_ADDRESS
  		uint8_t newMACAddress[] = OVERRIDE_MAC_ADDRESS;
  		esp_base_mac_addr_set(&newMACAddress[0]);
- 		printf("MAC address updated to: %s\n", WiFi.macAddress().c_str());
+ 		printf("%d: MAC address updated to: %s\n", millis(), WiFi.macAddress().c_str());
  	#endif
 
-	printf("Init CAN module\n");
+	printf("%d: Init CAN module\n", millis());
 	CAN_cfg.speed = CAN_SPEED_250KBPS;
 	CAN_cfg.tx_pin_id = canTxPin;
 	CAN_cfg.rx_pin_id = canRxPin;
 	CAN_cfg.rx_queue = xQueueCreate(receiveQueueSize, sizeof(CAN_frame_t));
 	ESP32Can.CANInit();
 
-	printf("Init HomeSpan\n");
+	printf("%d: Init HomeSpan\n", millis());
 	homeSpan.setWifiCredentials(ssid, sspwd);
 	homeSpan.setSketchVersion(versionString);
 	homeSpan.begin(Category::Bridges, "RV-Bridge", DEFAULT_HOST_NAME, "RV-Bridge-ESP32");
@@ -937,7 +937,7 @@ void setup() {
 	createDevices();
 	addCommands();
 
-	printf("Init complete.\n");
+	printf("%d: Init complete.\n", millis());
 }
 
 //////////////////////////////////////////////
@@ -946,7 +946,7 @@ void processPacket(CAN_frame_t *packet, uint8_t printPacket) {
 	bool knownPacket = true;
 
 	if (packet->FIR.B.RTR == CAN_RTR) {
-		printf("RTR from 0x%08X, DLC %d\r\n", packet->MsgID,  packet->FIR.B.DLC);
+		printf("%d: RTR from 0x%08X, DLC %d\r\n", millis(), packet->MsgID,  packet->FIR.B.DLC);
 	}
 	else {
 		uint32_t dgn = getMsgBits(packet->MsgID, 24, 17);
@@ -976,7 +976,7 @@ void processPacket(CAN_frame_t *packet, uint8_t printPacket) {
 			uint8_t status = (d[6] >> 2) & 3;
 
 			// if (instance == 4) {
-			// 	printf("DC_DIMMER_STATUS_3: inst=%d, grp=0X%02X, bright=%d, enable=%d, dur=%d, last cmd=%d, status=0X%02X\n", instance, group, brightness, enable, delayDuration, lastCmd, status);				
+			// 	printf("%d: DC_DIMMER_STATUS_3: inst=%d, grp=0X%02X, bright=%d, enable=%d, dur=%d, last cmd=%d, status=0X%02X\n", millis(), instance, group, brightness, enable, delayDuration, lastCmd, status);				
 			// }
 			setSwitchLevel(instance, brightness);
 		}
@@ -988,7 +988,7 @@ void processPacket(CAN_frame_t *packet, uint8_t printPacket) {
 			uint8_t delayDuration = d[4];
 
 			// if (instance!=32 && instance!=43 && instance!=44 && instance!=53 && instance!=54 && instance!=55 && instance!=56) {
-			// 	printf("DC_DIMMER_COMMAND_2: inst=%d, grp=0X%02X, bright=%d, cmd=0X%02X, dur=%d\n", instance, group, brightness, cmd, delayDuration);	
+			// 	printf("%d: DC_DIMMER_COMMAND_2: inst=%d, grp=0X%02X, bright=%d, cmd=0X%02X, dur=%d\n", millis(), instance, group, brightness, cmd, delayDuration);	
 			// 	printPacket = packetPrintYes;			
 			// }
 		}
@@ -996,7 +996,7 @@ void processPacket(CAN_frame_t *packet, uint8_t printPacket) {
 			uint8_t instance = d[0];
 			double tempC = convToTempC(d[2]<<8 | d[1]);
 			
-			// printf("THERMOSTAT_AMBIENT_STATUS: #%d, temp=%fºC\n", instance, tempC);
+			// printf("%d: THERMOSTAT_AMBIENT_STATUS: #%d, temp=%fºC\n", millis(), instance, tempC);
 			setAmbientTemp(instance, tempC);
 		}
 		else if (dgn == THERMOSTAT_STATUS_1 || dgn == THERMOSTAT_COMMAND_1) {
@@ -1009,7 +1009,7 @@ void processPacket(CAN_frame_t *packet, uint8_t printPacket) {
 			double coolTemp = convToTempC(d[6]<<8 | d[5]);
 			
 			// const char* dgnName = (dgn == THERMOSTAT_STATUS_1) ? "THERMOSTAT_STATUS_1" : "THERMOSTAT_COMMAND_1";
-			// printf("%s: inst=%d, opMode=%d, fanMode=%d, fanSpeed=%d, heatTemp=%fºC, coolTemp=%fºC\n", dgnName, instance, opMode, fanMode, fanSpeed, heatTemp, coolTemp);
+			// printf("%d: %s: inst=%d, opMode=%d, fanMode=%d, fanSpeed=%d, heatTemp=%fºC, coolTemp=%fºC\n", millis(), dgnName, instance, opMode, fanMode, fanSpeed, heatTemp, coolTemp);
 			setThermostatInfo(instance, opMode, fanMode, fanSpeed, heatTemp, coolTemp);
 		}
 		else if (dgn == AIR_CONDITIONER_STATUS) {
@@ -1030,7 +1030,7 @@ void processPacket(CAN_frame_t *packet, uint8_t printPacket) {
 
 		}
 		else if (dgn == GENERIC_INDICATOR_COMMAND) {
-			// printf("GENERIC_INDICATOR_COMMAND: inst=%d, grp=0X%02X, bright=%d, bank=%d, dur=%d, func=%d\n", d[0], d[1], d[2], d[3], d[4], d[6]);
+			// printf("%d: GENERIC_INDICATOR_COMMAND: inst=%d, grp=0X%02X, bright=%d, bank=%d, dur=%d, func=%d\n", millis(), d[0], d[1], d[2], d[3], d[4], d[6]);
 		}
 		else if (dgn == GENERIC_CONFIGURATION_STATUS) {
 			
@@ -1077,10 +1077,10 @@ void processPacket(CAN_frame_t *packet, uint8_t printPacket) {
 
 		if (printPacket==packetPrintYes || (!knownPacket && printPacket==packetPrintIfUnknown)) {
 			if (packet->FIR.B.FF == CAN_frame_std) {
-				printf("Std - ");
+				printf("%d: Std - ", millis());
 			}
 			else {
-				printf("Ext - ");
+				printf("%d: Ext - ", millis());
 			}
 
 			printf("dgn=%05X, src=%02X, pri=%d, Data: ", dgn, sourceAddr, priority);

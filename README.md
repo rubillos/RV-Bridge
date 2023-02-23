@@ -23,7 +23,7 @@
 * Connects to the RV-C network in many modern RVs.
     * RV-C is a subset of CAN-Bus running at 250kbps.
 * Uses an ESP32 with a CAN-Bus interface.
-* Connects lights, fans, and thermostats to HomeKit.
+* Connects lights, fans, switches, and thermostats to HomeKit.
 * Fits inside the RV wiring panel.
 * Plugs into an unused CAN-Bus socket for power and data.
 * STL files for a 3D printed case are included.
@@ -71,11 +71,11 @@ RV-Bridge is the result of putting these pieces together.
 ---
 ## <a name="hardware"></a>Hardware
 
-Uses an ESP32 with a CAN-Bus interface, either as separate components, or more easily, this board from [skpang.co.uk](https://www.skpang.co.uk):
+Uses an ESP32 with a CAN-Bus interface, either as separate components, or more easily, this board I found from [skpang.co.uk](https://www.skpang.co.uk):
 
 ![ESP32 Module](/images/board_in_box.jpeg)
 
-In the U.S. you can find it on the CopperHillTech Website:<br>
+In the U.S. it's available on the CopperHillTech Website:<br>
 [ESP32 with WiFi, Bluetooth Classic, BLE, CAN Bus Module](https://copperhilltech.com/esp32-wifi-bluetooth-classic-ble-can-bus-module/)
 
 This board has everything needed, including a regulator for powering the device off of the 12V provided by the RV-C connector.

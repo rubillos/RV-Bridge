@@ -90,7 +90,7 @@ Insert four 24AWG wires into the Can-Bus connector (I used silicone covered wire
 The CAN-Bus connector plugs into one of the available sockets inside the system wiring panel.
 
 |  |  |
-| :---: | --- |
+| :---: | :---: |
 | <br>![Cable Wiring](/images/cable.jpeg) |![Can-Bus Connector Wiring](/images/CAN-connector-wiring.jpg) |
 | ![G7 Panel](/images/G7_panel.jpeg) | ![Home App](/images/Home_App.PNG) |
 
@@ -143,9 +143,9 @@ The CAN-Bus connector plugs into one of the available sockets inside the system 
     * Add the bridge and all of your accessories, choosing appropriate rooms and names for them.
     * Done!
 - The status LED will flash based on what the bridge is doing:
-    * 🔴 <span style="color:red">Red</span> every 2 seconds as a heartbeat indicator.
-    * 🟢 <span style="color:green">Green</span> when CAN-Bus packets are sent.
-    * 🔵 <span style="color:blue">Blue</span> when HomeKit messages are received.
+    * 🔴 Red every 2 seconds as a heartbeat indicator.
+    * 🟢 Green when CAN-Bus packets are sent.
+    * 🔵 Blue when HomeKit messages are received.
 
 ---
 ## <a name="outputs"></a>Finding Output Numbers
@@ -174,13 +174,16 @@ Currently the project includes definition files for these RVs in the `RV` folder
     * `RV-Bridge_Box_Bottom.stl`
     * `RV-Bridge_Box_Top.stl`
 - Slicer
-    * Prusa Slicer 2.5.0
+    * I used Prusa Slicer 2.5.0
+- Build Plate
+    * A textured build plate give a nice surface finish for the top and bottom of the box.
 - Filament
-    * PETG (handles heat better than PLA).
-- Settings
-    * `Layer Height` to 0.3mm (faster printing)
-    * `Extrusion Width` to 0.55mm (eliminates tiny infill strips in the walls).
-    * `Perimeter Transitioning Threshold Angle` to 20 (keeps the lettering connected).
+    * PETG - handles heat better than PLA and sticks to a textured build plate much better than PLA.
+- Settings to adjust:
+    * `Layer Height`: 0.3mm (faster printing)
+    * `Extrusion Width`: 0.55mm (eliminates tiny infill strips in the walls).
+    * `Perimeter Transitioning Threshold Angle`: 20 (keeps the lettering connected).
+    * `Bridging Angle`: 180º (bridging in the layer above the lettering should be parallel to the baseline of the text.)
 
 ---
 ## <a name="notes"></a>Notes and Tips

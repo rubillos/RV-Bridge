@@ -377,7 +377,9 @@ struct RVRoofFan : Service::Fan {
 					sendOnOff(_upIndex, false);
 					sendOnOff(_downIndex, true);
 				}
+				_lidUp = newValue;
 			}
+			_fanPower = newValue;
 		}
 
 		return(true);  
@@ -385,25 +387,31 @@ struct RVRoofFan : Service::Fan {
 	
 	void setLevel(uint8_t index, uint8_t level) {
 		bool on = level > 0;
+		bool changed = false;
 
 		if (index == _index) {
 			_fanPower = on;
+			changed = true;
 			lastPacketRecvTime = 0;
 		}
 		else if (index == _upIndex && on) {
 			_lidUp = true;
+			changed = true;
 			lastPacketRecvTime = 0;
 		}
 		else if (index == _downIndex && on) {
 			_lidUp = false;
+			changed = true;
 			lastPacketRecvTime = 0;
 		}
 
-		bool newState = _fanPower && (_upIndex==-1 || _lidUp);
+		if (changed) {
+			bool newState = _fanPower && (_upIndex==-1 || _lidUp);
 
-		if (newState != _active->getVal()) {
-			printf("%d: Fan #%d: active = %d\n", millis(), index, newState);
-			_active->setVal(newState);
+			if (newState != _active->getVal()) {
+				printf("%d: Fan #%d: active = %d\n", millis(), _index, newState);
+				_active->setVal(newState);
+			}
 		}
 	}
 };
@@ -496,21 +504,26 @@ struct RVHVACFan : Service::Fan {
 
 	void setLevel(uint8_t index, uint8_t level) {
 		bool on = level > 0;
+		bool changed = false;
 
 		if (index == _fanHIndex && on != _fanHRunning) {
 			_fanHRunning = on;
+			changed = true;
 			lastPacketRecvTime = 0;
 		}
 		else if (index == _fanLIndex && on != _fanLRunning) {
 			_fanLRunning = on;
+			changed = true;
 			lastPacketRecvTime = 0;
 		}
 
-		uint8_t newState = (_fanHRunning || _fanLRunning) ? currentFanStateBlowing : currentFanStateIdle;
+		if (changed) {
+			uint8_t newState = (_fanHRunning || _fanLRunning) ? currentFanStateBlowing : currentFanStateIdle;
 
-		if (newState != _currentState->getVal()) {
-			printf("%d: HVACFan #%d: currentState = %d\n", millis(), _index, newState);
-			_currentState->setVal(newState);
+			if (newState != _currentState->getVal()) {
+				printf("%d: HVACFan #%d: currentState = %d\n", millis(), _index, newState);
+				_currentState->setVal(newState);
+			}
 		}
 	}
 };

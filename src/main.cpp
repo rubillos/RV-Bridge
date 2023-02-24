@@ -71,10 +71,11 @@ CAN_device_t CAN_cfg;               	// CAN Config
 enum {
 	packetPrintNo = 0,
 	packetPrintYes,
-	packetPrintIfUnknown
+	packetPrintIfUnknown,
+	packetPrintIfKnown
 };
 
-void processPacket(CAN_frame_t *packet, uint8_t printPacket);
+void displayPacket(CAN_frame_t *packet, uint8_t printPacket);
 uint8_t packetPrintMode = packetPrintNo;
 
 //////////////////////////////////////////////
@@ -96,6 +97,20 @@ constexpr uint32_t GENERATOR_STATUS_1 = 0x1FFDC;
 
 constexpr uint32_t FURNACE_STATUS = 0x1FFE4;
 constexpr uint32_t FURNACE_COMMAND = 0x1FFE3;
+
+constexpr uint32_t INVERTER_TEMPERATURE_STATUS = 0x1FEBD;	
+constexpr uint32_t DC_LOAD_STATUS_2 = 0x1FED;
+constexpr uint32_t ATS_AC_STATUS_4 = 0x1FF85;
+constexpr uint32_t ATS_STATUS = 0x1FFAA;	
+constexpr uint32_t ATS_AC_STATUS_3 = 0x1FFAB;
+constexpr uint32_t ATS_AC_STATUS_1 = 0x1FFAD;
+constexpr uint32_t DC_LOAD_COMMAND = 0x1FFBC;
+constexpr uint32_t DC_LOAD_STATUS = 0x1FFBD;
+constexpr uint32_t AC_LOAD_STATUS = 0x1FFBF;
+constexpr uint32_t CHARGER_AC_STATUS_1 = 0x1FFCA;
+constexpr uint32_t INVERTER_STATUS = 0x1FFD4;
+constexpr uint32_t INVERTER_AC_STATUS_1 = 0x1FFD7;
+constexpr uint32_t DC_SOURCE_STATUS_2 = 0x1FFFC;
 
 //////////////////////////////////////////////
 
@@ -233,7 +248,7 @@ void sendDCDimmerCmd(uint8_t index, uint8_t brightness, uint8_t cmd, uint8_t dur
 	queuePacket(&packet);
 
 	// printf("%d: Queueing Dimmer packet: #%d, bright=%d, cmd=%d, dur=%d\n", millis(), index, brightness, cmd, duration);
-	// processPacket(&packet, packetPrintYes);
+	// displayPacket(&packet, packetPrintYes);
 	// printf("%d: ** Packet queued.\n", millis());
 }
 
@@ -268,7 +283,7 @@ void sendThermostatCommand(uint8_t index, ThermostatMode mode, FanMode fanMode, 
 	queuePacket(&packet);
 
 	// printf("%d: Queueing Thermostat packet: #%d, mode=%d, fanMode=%d, temp=%fºC\n", millis(), index, mode, fanMode, tempC);
-	// processPacket(&packet, packetPrintIfUnknown);
+	// displayPacket(&packet, packetPrintYes);
 	// printf("%d: ** Packet queued.\n", millis());
 }
 
@@ -865,6 +880,10 @@ void cmdSetPacketLog(const char *buff) {
 			packetPrintMode = packetPrintIfUnknown;
 			printf("%d: Packet logging: If Unknown.\n", millis());
 			break;
+		case '3':
+			packetPrintMode = packetPrintIfKnown;
+			printf("%d: Packet logging: If Known.\n", millis());
+			break;
 		default:
 			printf("%d: cmdSetPacketLog: parameter error!\n", millis());
 	}
@@ -876,7 +895,7 @@ void addCommands() {
 	new SpanUserCommand('o',"<index>=<state:0-1>,... - send onOff to <index>", cmdSendOnOff);
 	new SpanUserCommand('a',"<index>=<tempºF>,... - set ambient temp of <index>", cmdSetAmbient);
 	new SpanUserCommand('w',"<0-1>,... - set CAN-Bus write enable", cmdSetCANWrite);
-	new SpanUserCommand('p',"<0-2>,... - set packet logging: 0=No, 1=Yes, 2=If unknown", cmdSetPacketLog);
+	new SpanUserCommand('p',"<0-2>,... - set packet logging: 0=No, 1=Yes, 2=If unknown, 3=If known", cmdSetPacketLog);
 	new SpanUserCommand('t',"<index>=<mode:0-2>,<tempºF>,optional(<fanmode:0-1>,<fanspeed:0-250>) - set info for thermostat <index>", cmsSetThermostat);
 }
 
@@ -942,7 +961,49 @@ void setup() {
 
 //////////////////////////////////////////////
 
-void processPacket(CAN_frame_t *packet, uint8_t printPacket) {
+void processPacket(CAN_frame_t *packet) {
+	if (packet->FIR.B.RTR != CAN_RTR) {
+		uint32_t dgn = getMsgBits(packet->MsgID, 24, 17);
+		uint8_t sourceAddr = getMsgBits(packet->MsgID, 7, 8);
+		uint8_t priority = getMsgBits(packet->MsgID, 28, 3);
+
+		uint8_t* d = packet->data.u8;
+
+		if (dgn == DC_DIMMER_STATUS_3) {
+			uint8_t instance = d[0];
+			uint8_t group = d[1];
+			uint8_t brightness = min(d[2], RVCBrightMax);
+			uint8_t enable = (d[3] >> 6) & 3;
+			uint8_t delayDuration = d[4];
+			DCDimmerCmd lastCmd = (DCDimmerCmd)d[5];
+			uint8_t status = (d[6] >> 2) & 3;
+
+			// if (instance == 4) {
+			// 	displayPacket(packet, packetPrintYes);
+			// }
+			setSwitchLevel(instance, brightness);
+		}
+		else if (dgn == THERMOSTAT_AMBIENT_STATUS) {
+			uint8_t instance = d[0];
+			double tempC = convToTempC(d[2]<<8 | d[1]);
+			
+			setAmbientTemp(instance, tempC);
+		}
+		else if (dgn == THERMOSTAT_STATUS_1) {
+			uint8_t instance = d[0];
+			ThermostatMode opMode = (ThermostatMode)(d[1] & 0x0F);
+			FanMode fanMode = (FanMode)((d[1]>>4) & 0x03);
+			uint8_t scheduleEnabled = ((d[1]>>6) & 0x03);
+			uint8_t fanSpeed = d[2];
+			double heatTemp = convToTempC(d[4]<<8 | d[3]);
+			double coolTemp = convToTempC(d[6]<<8 | d[5]);
+			
+			setThermostatInfo(instance, opMode, fanMode, fanSpeed, heatTemp, coolTemp);
+		}
+	}
+}
+
+void displayPacket(CAN_frame_t *packet, uint8_t printPacket) {
 	bool knownPacket = true;
 
 	if (packet->FIR.B.RTR == CAN_RTR) {
@@ -975,10 +1036,9 @@ void processPacket(CAN_frame_t *packet, uint8_t printPacket) {
 			DCDimmerCmd lastCmd = (DCDimmerCmd)d[5];
 			uint8_t status = (d[6] >> 2) & 3;
 
-			// if (instance == 4) {
-			// 	printf("%d: DC_DIMMER_STATUS_3: inst=%d, grp=0X%02X, bright=%d, enable=%d, dur=%d, last cmd=%d, status=0X%02X\n", millis(), instance, group, brightness, enable, delayDuration, lastCmd, status);				
-			// }
-			setSwitchLevel(instance, brightness);
+			if (printPacket==packetPrintYes || printPacket==packetPrintIfKnown) {
+				printf("%d: DC_DIMMER_STATUS_3: inst=%d, grp=0X%02X, bright=%d, enable=%d, dur=%d, last cmd=%d, status=0X%02X\n", millis(), instance, group, brightness, enable, delayDuration, lastCmd, status);				
+			}
 		}
 		else if (dgn == DC_DIMMER_COMMAND_2) {
 			uint8_t instance = d[0];
@@ -988,16 +1048,21 @@ void processPacket(CAN_frame_t *packet, uint8_t printPacket) {
 			uint8_t delayDuration = d[4];
 
 			// if (instance!=32 && instance!=43 && instance!=44 && instance!=53 && instance!=54 && instance!=55 && instance!=56) {
-			// 	printf("%d: DC_DIMMER_COMMAND_2: inst=%d, grp=0X%02X, bright=%d, cmd=0X%02X, dur=%d\n", millis(), instance, group, brightness, cmd, delayDuration);	
-			// 	printPacket = packetPrintYes;			
+			// 	printPacket = packetPrintYes;
 			// }
+
+			if (printPacket==packetPrintYes || printPacket==packetPrintIfKnown) {
+				printf("%d: DC_DIMMER_COMMAND_2: inst=%d, grp=0X%02X, bright=%d, cmd=0X%02X, dur=%d\n", millis(), instance, group, brightness, cmd, delayDuration);	
+				printPacket = packetPrintYes;			
+			}
 		}
 		else if (dgn == THERMOSTAT_AMBIENT_STATUS) {
 			uint8_t instance = d[0];
 			double tempC = convToTempC(d[2]<<8 | d[1]);
 			
-			// printf("%d: THERMOSTAT_AMBIENT_STATUS: #%d, temp=%fºC\n", millis(), instance, tempC);
-			setAmbientTemp(instance, tempC);
+			if (printPacket==packetPrintYes || printPacket==packetPrintIfKnown) {
+				printf("%d: THERMOSTAT_AMBIENT_STATUS: #%d, temp=%fºC\n", millis(), instance, tempC);
+			}
 		}
 		else if (dgn == THERMOSTAT_STATUS_1 || dgn == THERMOSTAT_COMMAND_1) {
 			uint8_t instance = d[0];
@@ -1007,10 +1072,12 @@ void processPacket(CAN_frame_t *packet, uint8_t printPacket) {
 			uint8_t fanSpeed = d[2];
 			double heatTemp = convToTempC(d[4]<<8 | d[3]);
 			double coolTemp = convToTempC(d[6]<<8 | d[5]);
+
+			const char* name = (dgn == THERMOSTAT_COMMAND_1) ? "THERMOSTAT_COMMAND_1" : "THERMOSTAT_STATUS_1";
 			
-			// const char* dgnName = (dgn == THERMOSTAT_STATUS_1) ? "THERMOSTAT_STATUS_1" : "THERMOSTAT_COMMAND_1";
-			// printf("%d: %s: inst=%d, opMode=%d, fanMode=%d, fanSpeed=%d, heatTemp=%fºC, coolTemp=%fºC\n", millis(), dgnName, instance, opMode, fanMode, fanSpeed, heatTemp, coolTemp);
-			setThermostatInfo(instance, opMode, fanMode, fanSpeed, heatTemp, coolTemp);
+			if (printPacket==packetPrintYes || printPacket==packetPrintIfKnown) {
+				printf("%d: %s: inst=%d, opMode=%d, fanMode=%d, fanSpeed=%d, heatTemp=%fºC, coolTemp=%fºC\n", millis(), name, instance, opMode, fanMode, fanSpeed, heatTemp, coolTemp);
+			}
 		}
 		else if (dgn == AIR_CONDITIONER_STATUS) {
 			uint8_t instance = d[0];
@@ -1075,7 +1142,7 @@ void processPacket(CAN_frame_t *packet, uint8_t printPacket) {
 			knownPacket = false;
 		}
 
-		if (printPacket==packetPrintYes || (!knownPacket && printPacket==packetPrintIfUnknown)) {
+		if (printPacket==packetPrintYes || (!knownPacket && printPacket==packetPrintIfUnknown) || (knownPacket && printPacket==packetPrintIfKnown)) {
 			if (packet->FIR.B.FF == CAN_frame_std) {
 				printf("%d: Std - ", millis());
 			}
@@ -1116,7 +1183,10 @@ void loop() {
 	CAN_frame_t packet;
 
 	if (xQueueReceive(CAN_cfg.rx_queue, &packet, 0) == pdTRUE) {
-		processPacket(&packet, packetPrintMode);
+		if (packetPrintMode != packetPrintNo) {
+			displayPacket(&packet, packetPrintMode);
+		}
+		processPacket(&packet);
 	}
 
 	processPacketQueue();

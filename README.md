@@ -161,8 +161,8 @@ The whole multiplex system connects back to a panel with outputs for all of the 
 
 Currently the project includes definition files for these RVs in the `RV` folder:
 
-`Miramar_2020_3202.h` - 2020 Thor Miramar 32.2<br>
-`Aria_2019_3901.h` - 2019 Thor Aria 39.1
+[Miramar_2020_3202.h](/src/RV/Miramar_2020_3202.h) - 2020 Thor Miramar 32.2<br>
+[Aria_2019_3901.h](/src/RV/Aria_2019_3901.h) - 2019 Thor Aria 39.1
 
 (Additional definition files are welcome!)
 
@@ -171,8 +171,8 @@ Currently the project includes definition files for these RVs in the `RV` folder
 
 - A case will keep the microcontroller isolated from any exposed contacts inside the wiring panel.
 - STL Files are in the `3D` folder:
-    * `RV-Bridge_Box_Bottom.stl`
-    * `RV-Bridge_Box_Top.stl`
+    * [RV-Bridge_Box_Bottom.stl](/3D/RV-Bridge_Box_Bottom.stl)
+    * [RV-Bridge_Box_Top.stl](/3D/RV-Bridge_Box_Top.stl)
 - Slicer
     * I used Prusa Slicer 2.5.0
 - Build Plate

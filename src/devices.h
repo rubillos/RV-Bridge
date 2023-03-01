@@ -50,11 +50,15 @@ typedef struct {
 } FanDeviceRec;
 
 typedef struct {
-    int16_t index;
+    int16_t coolingInstance;
+
     int16_t compressorIndex;
     int16_t fanHIndex;
     int16_t fanLIndex;
-    int16_t furnaceIndex;
+
+    int16_t furnaceInstance;
+    int16_t combustionIndex;
+
     const char* name;
 } ThermostatDeviceRec;
 

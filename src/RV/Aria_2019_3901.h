@@ -57,8 +57,8 @@ const FanDeviceRec fanList[] = {
     23, 29, 30, "Rear Bathroom"
 };
 
-// index, compressorIndex, fanHIndex, fanLIndex, furnaceIndex[or -1], name
+// coolingInstance, compressorIndex, fanHIndex, fanLIndex, furnaceInstance[or -1], combustionIndex[or -1], name
 const ThermostatDeviceRec thermostatList[] = {
-    0, 37, 38, 39, 33, "Front",
-    1, 45, 46, 47, -1, "Back"
+    0, 37, 38, 39, 2, 33, "Front",
+    1, 45, 46, 47, -1, -1, "Back"
 };

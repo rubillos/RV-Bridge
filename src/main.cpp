@@ -86,7 +86,7 @@ constexpr uint32_t DC_DIMMER_COMMAND_2 = 0x1FEDB;
 constexpr uint32_t DC_DIMMER_STATUS_3 = 0x1FEDA;
 constexpr uint32_t THERMOSTAT_AMBIENT_STATUS = 0x1FF9C;
 constexpr uint32_t THERMOSTAT_STATUS_1 = 0x1FFE2;
-constexpr uint32_t THERMOSTAT_COMMAND_1 = 0x1FFE9;
+constexpr uint32_t THERMOSTAT_COMMAND_1 = 0x1FEF9;
 
 constexpr uint32_t AIR_CONDITIONER_STATUS = 0x1FFE0; // 1FFE1
 constexpr uint32_t GENERIC_INDICATOR_COMMAND = 0x1FED9;
@@ -130,28 +130,42 @@ typedef enum {
 	DCDimmerCmdLock,
 	DCDimmerCmdUnlock,
 	DCDimmerCmdFlash,
-	DCDimmerCmdFlashMomentarily
+	DCDimmerCmdFlashMomentarily,
+
+	DCDimmerCmdNA = 255
 } DCDimmerCmd;
 
 typedef enum {
 	ACModeAuto = 0,
-	ACModeManual
+	ACModeManual,
+
+	ACModeNA = 3
 } ACMode;
 
 typedef enum {
 	ThermostatModeOff = 0,
 	ThermostatModeCool,
 	ThermostatModeHeat,
-	ThermostatModeFanOnly
+	ThermostatModeAuto,
+	ThermostatModeFanOnly,
+	ThermostatModeAuxHeat,
+	ThermostatModeDehumidify,
+
+	ThermostatModeNA = 7
 } ThermostatMode;
 
 typedef enum {
 	FanModeAuto = 0,
-	FanModeOn
+	FanModeOn,
+
+	FanModeNA = 3
 } FanMode;
+
+constexpr double TempC_NA = 1775.0;
 
 constexpr uint8_t RVCPercentMax = 250;
 constexpr uint8_t RVCBrightMax = 200;
+constexpr uint8_t RVCFanMax = 200;
 constexpr uint8_t HomeKitPercentMax = 100;
 
 //////////////////////////////////////////////
@@ -282,7 +296,7 @@ void sendThermostatCommand(uint8_t index, ThermostatMode mode, FanMode fanMode, 
 
 	queuePacket(&packet);
 
-	// printf("%d: Queueing Thermostat packet: #%d, mode=%d, fanMode=%d, temp=%fºC\n", millis(), index, mode, fanMode, tempC);
+	// printf("%d: Queueing Thermostat packet: #%d, mode=%d, fanMode=%d, temp=%0.1fºC\n", millis(), index, mode, fanMode, tempC);
 	// displayPacket(&packet, packetPrintYes);
 	// printf("%d: ** Packet queued.\n", millis());
 }
@@ -451,7 +465,7 @@ struct RVHVACFan : Service::Fan {
 		_currentState = new Characteristic::CurrentFanState(currentFanStateIdle);
 		_targetState = new Characteristic::TargetFanState(targetFanStateAuto);
 	
-		_index = device->index;
+		_index = device->coolingInstance;
 		_fanHIndex = device->fanHIndex;
 		_fanLIndex = device->fanLIndex;
 		_updateFunction = updateFunction;
@@ -494,7 +508,7 @@ struct RVHVACFan : Service::Fan {
 	void getModeSpeed(FanMode* fanMode, uint8_t *speed) {
 		if (_active->getNewVal()) {
 			*fanMode = FanModeOn;
-			*speed = _speed->getNewVal() * RVCPercentMax / HomeKitPercentMax;
+			*speed = _speed->getNewVal() * RVCFanMax / HomeKitPercentMax;
 		}
 		else {
 			*fanMode = FanModeAuto;
@@ -536,9 +550,13 @@ struct RVThermostat : Service::Thermostat {
 
 	RVHVACFan *_fan;
 
-	int16_t _index;
+	int16_t _coolingInstance;
 	int16_t _compressorIndex;
-	int16_t _furnaceIndex;
+	ThermostatMode _coolingMode = ThermostatModeOff;
+
+	int16_t _furnaceInstance;
+	int16_t _combustionIndex;
+	ThermostatMode _furnaceMode = ThermostatModeOff;
 
 	bool _compressorRunning = false;
 	bool _furnaceRunning = false;
@@ -551,22 +569,24 @@ struct RVThermostat : Service::Thermostat {
 		_targetState = new Characteristic::TargetHeatingCoolingState(heatingCoolingStateOff);
 		new Characteristic::TemperatureDisplayUnits(1);
 
-		if (device->furnaceIndex != -1) {
+		if (device->furnaceInstance != -1) {
 			_targetState->setValidValues(3, heatingCoolingStateOff, heatingCoolingStateHeat, heatingCoolingStateCool);
 		}
 		else {
 			_targetState->setValidValues(2, heatingCoolingStateOff, heatingCoolingStateCool);
 		}
 
-		_index = device->index;
+		_coolingInstance = device->coolingInstance;
 		_compressorIndex = device->compressorIndex;
-		_furnaceIndex = device->furnaceIndex;
+
+		_furnaceInstance = device->furnaceInstance;
+		_combustionIndex = device->combustionIndex;
 
 		_fan = new RVHVACFan(device, [this]()->bool { updateThermostat(); return true; });
 	}
 
 	void updateThermostat() {
-		printf("%d: Thermostat #%d: Send thermostat info\n", millis(), _index);
+		printf("%d: Thermostat #%d: Send thermostat info\n", millis(), _coolingInstance);
 		ThermostatMode modeLookup[] { ThermostatModeOff, ThermostatModeHeat, ThermostatModeCool };
 		ThermostatMode opMode = modeLookup[_targetState->getNewVal()];
 		FanMode fanMode;
@@ -574,18 +594,33 @@ struct RVThermostat : Service::Thermostat {
 
 		_fan->getModeSpeed(&fanMode, &speed);
 
-		sendThermostatCommand(_index, opMode, fanMode, speed, _targetTemp->getNewVal<double>());
+		if (opMode == ThermostatModeOff && fanMode == FanModeOn) {
+			opMode = ThermostatModeFanOnly;
+		}
+
+		if (_furnaceInstance!=-1 && opMode==ThermostatModeHeat) {
+			if (_coolingMode != ThermostatModeOff) {
+				sendThermostatCommand(_coolingInstance, ThermostatModeOff, FanModeAuto, 0xFF, _targetTemp->getNewVal<double>());
+			}
+			sendThermostatCommand(_furnaceInstance, opMode, FanModeAuto, 0xFF, _targetTemp->getNewVal<double>());
+		}
+		else {
+			if (_furnaceMode != ThermostatModeOff) {
+				sendThermostatCommand(_furnaceInstance, ThermostatModeOff, FanModeNA, 0xFF, _targetTemp->getNewVal<double>());
+			}
+			sendThermostatCommand(_coolingInstance, opMode, fanMode, speed, _targetTemp->getNewVal<double>());
+		}
 	}
 
 	boolean update() {
 		bool sendInfo = false;
 
 		if (_targetState->updated()) {
-			printf("%d: RVThermostat #%d, Target State: %d\n", millis(), _index, _targetState->getNewVal());
+			printf("%d: RVThermostat #%d, Target State: %d\n", millis(), _coolingInstance, _targetState->getNewVal());
 			sendInfo = true;
 		}
 		if (_targetTemp->updated()) {
-			printf("%d: RVThermostat #%d - Target Temp: %f\n", millis(), _index, _targetTemp->getNewVal<double>());
+			printf("%d: RVThermostat #%d - Target Temp: %f\n", millis(), _coolingInstance, _targetTemp->getNewVal<double>());
 			sendInfo = true;
 		}
 		if (sendInfo) {
@@ -604,7 +639,7 @@ struct RVThermostat : Service::Thermostat {
 			_compressorRunning = on;
 			changed = true;
 		}
-		if (index == _furnaceIndex && on != _furnaceRunning) {
+		if (index == _combustionIndex && on != _furnaceRunning) {
 			printf("%d: Thermostat #%d: furnace = %d\n", millis(), index, on);
 			_furnaceRunning = on;
 			changed = true;
@@ -630,23 +665,20 @@ struct RVThermostat : Service::Thermostat {
 	}
 
 	void setAmbientTemp(uint8_t index, double tempC) {
-		if (index == _index && fabs(tempC - _ambientTemp->getVal<double>()) > 0.2) {
-			printf("%d: Set ambient temp #%d: %fºC\n", millis(), _index, tempC);
+		if (index == _coolingInstance && fabs(tempC - _ambientTemp->getVal<double>()) > 0.2) {
+			printf("%d: Set ambient temp #%d: %0.1fºC\n", millis(), _coolingInstance, tempC);
 			_ambientTemp->setVal(tempC);
 			lastPacketRecvTime = 0;
 		}
 	}
 
 	void setInfo(uint8_t index, ThermostatMode opMode, FanMode fanMode, uint8_t fanSpeed, double heatTemp, double coolTemp) {
-		if (index == _index) {
-			uint8_t modeConvert[] { heatingCoolingStateOff, heatingCoolingStateCool, heatingCoolingStateHeat, heatingCoolingStateOff };
-			uint8_t mode = modeConvert[opMode];
-			uint8_t newFan = fanMode == FanModeOn;
+		bool updateMode = false;
 
-			if (mode != _targetState->getVal()) {
-				printf("%d: Thermostat #%d: targetState = %d\n", millis(), index, mode);
-				_targetState->setVal(mode);
-				lastPacketRecvTime = 0;
+		if (index == _coolingInstance) {
+			if (opMode != _coolingMode) {
+				_coolingMode = opMode;
+				updateMode = true;
 			}
 			if (fabs(coolTemp - _targetTemp->getVal<double>()) > 0.2) {
 				printf("%d: Thermostat #%d: targetTemp = %f\n", millis(), index, coolTemp);
@@ -654,6 +686,32 @@ struct RVThermostat : Service::Thermostat {
 				lastPacketRecvTime = 0;
 			}
 			_fan->setModeSpeed(fanMode, fanSpeed);
+		}
+		else if (index == _furnaceInstance) {
+			if (opMode != _furnaceMode) {
+				_furnaceMode = opMode;
+				updateMode = true;
+			}
+		}
+
+		if (updateMode) {
+			uint8_t mode;
+
+			if (_furnaceMode == ThermostatModeHeat) {
+				mode = heatingCoolingStateHeat;
+			}
+			else {
+				uint8_t modeConvert[] { heatingCoolingStateOff, heatingCoolingStateCool, heatingCoolingStateHeat, heatingCoolingStateOff,
+										heatingCoolingStateOff, heatingCoolingStateOff, heatingCoolingStateOff, heatingCoolingStateOff };
+				
+				mode = modeConvert[_coolingMode];
+			}
+
+			if (mode != _targetState->getVal()) {
+				printf("%d: Thermostat #%d: targetState = %d\n", millis(), index, mode);
+				_targetState->setVal(mode);
+				lastPacketRecvTime = 0;
+			}
 		}
 	}
 };
@@ -715,7 +773,7 @@ void createDevices() {
 		}
 
 		for (ThermostatDeviceRec thermostat : thermostatList) {
-			printf("%d: Creating Thermostat #%d: \"%s\"\n", millis(), thermostat.index, thermostat.name);
+			printf("%d: Creating Thermostat #%d: \"%s\"\n", millis(), thermostat.coolingInstance, thermostat.name);
 			SPAN_ACCESSORY(thermostat.name);
 				thermostats[thermostatCount++] = new RVThermostat(&thermostat);
 		}
@@ -799,7 +857,7 @@ void cmdSetAmbient(const char *buff) {
 
 		if (index!=-1 && tempF!=-1) {
 			double tempC = (tempF - 32.0) / 1.8;
-			printf("%d: cmdSetAmbient: index=%d, tempF=%dºF (%fºC)\n", millis(), index, tempF, tempC);
+			printf("%d: cmdSetAmbient: index=%d, tempF=%dºF (%0.1fºC)\n", millis(), index, tempF, tempC);
 			setAmbientTemp(index, tempC);
 		}
 		else {
@@ -831,7 +889,7 @@ void cmsSetThermostat(const char *buff) {
 
 	if (index!=-1 && opMode!=-1 && fanMode!=-1 && fanSpeed!=-1 && tempF!=-1) {
 		double tempC = (tempF - 32.0) / 1.8;
-		printf("%d: cmsSetThermostat: index=%d, mode=%d, temp=%dºF (%fºC), fanMode=%d, fanSpeed=%d\n", millis(), index, opMode, tempF, tempC, fanMode, fanSpeed);
+		printf("%d: cmsSetThermostat: index=%d, mode=%d, temp=%dºF (%0.1fºC), fanMode=%d, fanSpeed=%d\n", millis(), index, opMode, tempF, tempC, fanMode, fanSpeed);
 		setThermostatInfo(index, (ThermostatMode)opMode, (FanMode)fanMode, fanSpeed, tempC, tempC);
 	}
 	else {
@@ -941,9 +999,15 @@ void initPins() {
 	}
 }
 
+bool wifiReady = false;
+
+void wifiConnected() {
+	wifiReady = true;
+}
+
 void setup() {
 	initPins();
-	flashPin(indicatorPinR, 20, 200);
+	flashPin(indicatorPinB, 20, 200);
 
 	Serial.begin(115200);
 	printf("%d: RV Bridge - Startup\n", millis());
@@ -964,6 +1028,7 @@ void setup() {
 	printf("%d: Init HomeSpan\n", millis());
 	homeSpan.setWifiCredentials(ssid, sspwd);
 	homeSpan.setSketchVersion(versionString);
+	homeSpan.setWifiCallback(wifiConnected);
 	homeSpan.begin(Category::Bridges, "RV-Bridge", DEFAULT_HOST_NAME, "RV-Bridge-ESP32");
 
 	createDevices();
@@ -1013,6 +1078,15 @@ void processPacket(CAN_frame_t *packet) {
 			
 			setThermostatInfo(instance, opMode, fanMode, fanSpeed, heatTemp, coolTemp);
 		}
+		// else if (dgn == THERMOSTAT_COMMAND_1) {
+		// 	displayPacket(packet, packetPrintYes);
+		// }
+		// else if (dgn == FURNACE_COMMAND) {
+		// 	displayPacket(packet, packetPrintYes);
+		// }
+		// else if (dgn == FURNACE_STATUS) {
+		// 	displayPacket(packet, packetPrintYes);
+		// }
 	}
 }
 
@@ -1074,7 +1148,7 @@ void displayPacket(CAN_frame_t *packet, uint8_t printPacket) {
 			double tempC = convToTempC(d[2]<<8 | d[1]);
 			
 			if (printPacket==packetPrintYes || printPacket==packetPrintIfKnown) {
-				printf("%d: THERMOSTAT_AMBIENT_STATUS: #%d, temp=%fºC\n", millis(), instance, tempC);
+				printf("%d: THERMOSTAT_AMBIENT_STATUS: #%d, temp=%0.1fºC\n", millis(), instance, tempC);
 			}
 		}
 		else if (dgn == THERMOSTAT_STATUS_1 || dgn == THERMOSTAT_COMMAND_1) {
@@ -1089,7 +1163,7 @@ void displayPacket(CAN_frame_t *packet, uint8_t printPacket) {
 			const char* name = (dgn == THERMOSTAT_COMMAND_1) ? "THERMOSTAT_COMMAND_1" : "THERMOSTAT_STATUS_1";
 			
 			if (printPacket==packetPrintYes || printPacket==packetPrintIfKnown) {
-				printf("%d: %s: inst=%d, opMode=%d, fanMode=%d, fanSpeed=%d, heatTemp=%fºC, coolTemp=%fºC\n", millis(), name, instance, opMode, fanMode, fanSpeed, heatTemp, coolTemp);
+				printf("%d: %s: inst=%d, opMode=%d, fanMode=%d, fanSpeed=%d, heatTemp=%0.1fºC, coolTemp=%0.1fºC\n", millis(), name, instance, opMode, fanMode, fanSpeed, heatTemp, coolTemp);
 			}
 		}
 		else if (dgn == AIR_CONDITIONER_STATUS) {
@@ -1103,11 +1177,17 @@ void displayPacket(CAN_frame_t *packet, uint8_t printPacket) {
 			uint8_t deadBand2 = d[7];
 			
 		}
-		else if (dgn == FURNACE_STATUS) {
+		else if (dgn == FURNACE_STATUS || dgn == FURNACE_COMMAND) {
 			uint8_t instance = d[0];
 			ACMode opMode = (ACMode)(d[1] & 0x03);
-			uint8_t fanSpeed = d[4];
+			uint8_t fanSpeed = d[2];
+			uint8_t heatOutput = d[3];
 
+			const char* name = (dgn == FURNACE_COMMAND) ? "FURNACE_COMMAND" : "FURNACE_STATUS";
+
+			if (printPacket==packetPrintYes || printPacket==packetPrintIfKnown) {
+				printf("%d: %s: inst=%d, opMode=%d, fanSpeed=%d, heatOutput=%d\n", millis(), name, instance, opMode, fanSpeed, heatOutput);
+			}
 		}
 		else if (dgn == GENERIC_INDICATOR_COMMAND) {
 			// printf("%d: GENERIC_INDICATOR_COMMAND: inst=%d, grp=0X%02X, bright=%d, bank=%d, dur=%d, func=%d\n", millis(), d[0], d[1], d[2], d[3], d[4], d[6]);
@@ -1187,8 +1267,12 @@ void loop() {
 
 	bool hearbeatIndicator = (heartbeatTime % heatbeatRate) < heartbeatBlinkTime;
 
-	digitalWrite(indicatorPinR, !hearbeatIndicator);
-	digitalWrite(indicatorPinG, !sendIndicator);
+	if (!wifiReady) {
+		hearbeatIndicator = (heartbeatTime % (heatbeatRate/4)) > heartbeatBlinkTime*5;
+	}
+
+	digitalWrite(indicatorPinG, !hearbeatIndicator);
+	digitalWrite(indicatorPinR, !sendIndicator);
 	digitalWrite(indicatorPinB, !recvIndicator);
 
 	homeSpan.poll();

@@ -7,15 +7,14 @@
 1. [Features](#features)
 2. [Background](#background)
 3. [Current Project State](#state)
-4. [To-Do](#todo)
-5. [Hardware](#hardware)
-6. [Wiring](#wiring)
-7. [Firmware Setup](#firmware)
-8. [Finding Output Numbers](#outputs)
-9. [Supported RVs](#rvs)
-10. [3D Printing](#3dprint)
-11. [Notes and Tips](#notes)
-12. [Links](#links)
+4. [Hardware](#hardware)
+5. [Wiring](#wiring)
+6. [Firmware Setup](#firmware)
+7. [Finding Output Numbers](#outputs)
+8. [Supported RVs](#rvs)
+9. [3D Printing](#3dprint)
+10. [Notes and Tips](#notes)
+11. [Links](#links)
 
 ---
 ## <a name="features"></a>Features
@@ -53,7 +52,7 @@ I also recently started playing with [HomeSpan](https://github.com/HomeSpan/Home
 RV-Bridge is the result of putting these pieces together.
 
 ---
-## <a name="state"></a>Current Project State (v0.2.0)
+## <a name="state"></a>Current Project State (v0.9.0)
 
 * Homespan pairing works, devices show up in the Home app.
 * CAN-Bus packet receiving works.
@@ -62,11 +61,8 @@ RV-Bridge is the result of putting these pieces together.
 * The RV devices respond correctly.
 * Lights, switches, and fans are complete.
 * The temperature readings from thermostats are reflected in the Home app.
-
----
-## <a name="todo"></a>To-Do:
-
-* Thermostat setting functions.
+* Thermostat changes in the RV are reflected in the Home app.
+* RV responds to changes made in the Home app.
 
 ---
 ## <a name="hardware"></a>Hardware
@@ -143,8 +139,8 @@ The CAN-Bus connector plugs into one of the available sockets inside the system 
     * Add the bridge and all of your accessories, choosing appropriate rooms and names for them.
     * Done!
 - The status LED will flash based on what the bridge is doing:
-    * 🔴 Red every 2 seconds as a heartbeat indicator.
-    * 🟢 Green when CAN-Bus packets are sent.
+    * 🟢 Green every 2 seconds as a heartbeat indicator.
+    * 🔴 Red when CAN-Bus packets are sent.
     * 🔵 Blue when HomeKit messages are received.
 
 ---

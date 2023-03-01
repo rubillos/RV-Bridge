@@ -7,14 +7,15 @@
 1. [Features](#features)
 2. [Background](#background)
 3. [Current Project State](#state)
-4. [Hardware](#hardware)
-5. [Wiring](#wiring)
-6. [Firmware Setup](#firmware)
-7. [Finding Output Numbers](#outputs)
-8. [Supported RVs](#rvs)
-9. [3D Printing](#3dprint)
-10. [Notes and Tips](#notes)
-11. [Links](#links)
+4. [To-Do](#todo)
+5. [Hardware](#hardware)
+6. [Wiring](#wiring)
+7. [Firmware Setup](#firmware)
+8. [Finding Output Numbers](#outputs)
+9. [Supported RVs](#rvs)
+10. [3D Printing](#3dprint)
+11. [Notes and Tips](#notes)
+12. [Links](#links)
 
 ---
 ## <a name="features"></a>Features
@@ -52,7 +53,7 @@ I also recently started playing with [HomeSpan](https://github.com/HomeSpan/Home
 RV-Bridge is the result of putting these pieces together.
 
 ---
-## <a name="state"></a>Current Project State (v0.9.0)
+## <a name="state"></a>Current Project State (v1.0.0)
 
 * Homespan pairing works, devices show up in the Home app.
 * CAN-Bus packet receiving works.
@@ -62,6 +63,11 @@ RV-Bridge is the result of putting these pieces together.
 * Lights, switches, and fans are complete.
 * Temperature readings from thermostats are reflected in the Home app.
 * Thermostat control is complete.
+
+---
+## <a name="todo"></a>To-Do
+
+* Some RVs have AC units that can work as a heat pump; only the AC portion of these units is currently handled. (Ours only has a furnace so I don't currently have a way to implement this.)
 
 ---
 ## <a name="hardware"></a>Hardware

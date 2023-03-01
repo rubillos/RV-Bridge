@@ -43,7 +43,7 @@ The RV's lights, fans, and climate are all controlled through a [Firefly Integra
 | ![Firefly Main](/images/Firefly_main.jpeg) | ![Firefly Lights](/images/Firefly_lights.jpeg) |
 | ![Firefly Climate](/images/Firefly_climate.jpeg) | ![Firefly Fans](/images/Firefly_fans.jpeg) |
 
-It's a great system and works really well for control of the RV devices, but the iOS app is a bit slow to load/connect and can only be used in proximity to the RV. I've always wondered if there was a way to control it all via HomeKit and the Home app.
+It's a great system and works really well for control of the RV devices, but the iOS app is a bit slow to load/connect and can only be used in proximity to the RV. Since we already have an Apple TV onboard driving our TVs which could double as a hub, I've always wondered if there was a way to control it all via HomeKit and the Home app.
 
 Recently I came across some documentation for the bus protocol that's used by the Spectrum system, RV-C, a subset of CAN-Bus, as well as the open source project [CoachProxyOS](https://github.com/linuxkidd/coachproxy-os) that documents getting a Raspberry Pi set up to host a web page for controlling an RV's network using RV-C.
 
@@ -60,9 +60,8 @@ RV-Bridge is the result of putting these pieces together.
 * The correct RV-C packets are being sent over the bus based on changes made in the Home app for lights, switches, and fans.
 * The RV devices respond correctly.
 * Lights, switches, and fans are complete.
-* The temperature readings from thermostats are reflected in the Home app.
-* Thermostat changes in the RV are reflected in the Home app.
-* RV responds to changes made in the Home app.
+* Temperature readings from thermostats are reflected in the Home app.
+* Thermostat control is complete.
 
 ---
 ## <a name="hardware"></a>Hardware

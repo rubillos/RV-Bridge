@@ -185,16 +185,19 @@ uint32_t makeMsg(uint32_t dgn, uint8_t sourceID=0, uint8_t priority=6) {
 	return (priority<<26) | (dgn << 8) | sourceID;	
 }
 
+//////////////////////////////////////////////
+
 constexpr double tempCOffset = -273.0;
 constexpr double tempCScale = 0.03125;
 constexpr double tempCScaleInv = 1.0 / tempCScale;
+constexpr double tempCRoundingOffset = 0.25;
 
 double convToTempC(uint16_t value) {
-	return tempCOffset + value * tempCScale;
+	return tempCOffset + value * tempCScale + tempCRoundingOffset;
 }
 
 uint16_t convFromTempC(double tempC) {
-	return (tempC - tempCOffset) * tempCScaleInv;
+	return (tempC - tempCOffset) * tempCScaleInv + 0.5;
 }
 
 //////////////////////////////////////////////

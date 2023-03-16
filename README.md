@@ -31,7 +31,7 @@
 ---
 ## <a name="background"></a>Background
 
-At the start of the pandemic we realized that international travel was going to be off the table for a significant duration. We decided it was time to see more of the US West so we bought a class-A motorhome which we call ***The Penguin Express***. We've put [almost 30k miles on it so far](http://rickandrandy.com/?rvlife).
+At the start of the pandemic we realized that international travel was going to be off the table for a significant duration. We decided it was time to see more of the [Western US](http://rickandrandy.com/map/index.html?RV) so we bought a class-A motorhome which we call ***The Penguin Express***. We've put [almost 30k miles on it so far](http://rickandrandy.com/?rvlife).
 
 ![Penguin Express](/images/Penguin_Express.jpg)
 

@@ -25,13 +25,39 @@
  *  
  ********************************************************************************/
  
-#include <stdint.h>
+// Device definitions for a 2023 Jayco Terrain 19Y
 
-// #define OVERRIDE_MAC_ADDRESS {0x53, 0xC3, 0xD3, 0xBD, 0x20, 0x51}
+#include "devices.h"
 
-constexpr const char* ssid = "***";
-constexpr const char* sspwd = "***";
+// index, type, name
+const SwitchDeviceRec switchList[] = {
+    1,  Lamp, "Spotlight",
+    32, DimmableLamp, "Main Ceiling Lights",
+    34, DimmableLamp, "Bunk Accent Lights",
+    24, DimmableLamp, "Bed Ceiling Lights",
+    22, DimmableLamp, "Kitchen Counter Lights",
+    35, DimmableLamp, "Bench Lights",
+    25, DimmableLamp, "Cargo Lights",
+    21, Lamp, "Awning Lights",
+    23, Lamp, "Step Lights",
 
-constexpr uint8_t sourceAddress = 145;
+    3,  Switch, "Awning Extend",
+    4,  Switch, "Awning Retract",
+    9,  Switch, "Water Pump",
+    43, Switch, "A/C Cool",
+    8,  Switch, "Grey Water Tank Heater",
+    11, Switch, "Fan High",
+    12, Switch, "Fan Low"
+};
 
-#include "RV/Miramar_2020_3202.h"
+// index, upIndex[or -1], downIndex[or -1], name
+const FanDeviceRec fanList[] = {
+    20, 51, 52, "Kitchen" //,
+    // 21, -1, -1, "Bathroom"
+};
+
+// coolingInstance, compressorIndex, fanHIndex, fanLIndex, furnaceInstance[or -1], combustionIndex[or -1], name
+const ThermostatDeviceRec thermostatList[] = {
+    0, 25, 26, 27, 2, 33, "Front"//,
+    //1, 29, 30, 31, -1, -1, "Back"
+};

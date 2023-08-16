@@ -1007,6 +1007,10 @@ bool wifiReady = false;
 void wifiConnected() {
 	wifiReady = true;
 }
+// print out if the HomeSpan status changes
+void statusUpdate(HS_STATUS status){
+  Serial.printf("\n*** HOMESPAN STATUS CHANGE: %s\n",homeSpan.statusString(status));
+}
 
 void setup() {
 	initPins();
@@ -1032,6 +1036,7 @@ void setup() {
 	homeSpan.setWifiCredentials(ssid, sspwd);
 	homeSpan.setSketchVersion(versionString);
 	homeSpan.setWifiCallback(wifiConnected);
+	homeSpan.setStatusCallback(statusUpdate);
 	homeSpan.begin(Category::Bridges, "RV-Bridge", DEFAULT_HOST_NAME, "RV-Bridge-ESP32");
 
 	createDevices();
@@ -1263,7 +1268,7 @@ void loop() {
 
 	bool sendIndicator = lastPacketSendTime < packetBlinkTime;
 	bool recvIndicator = lastPacketRecvTime < packetBlinkTime;
-
+    
 	if (sendIndicator || recvIndicator) {
 		heartbeatTime = heartbeatBlinkTime;		// adjust next heartbeat time to avoid overlap with send/recv indicators
 	}

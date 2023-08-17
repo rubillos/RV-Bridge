@@ -105,7 +105,7 @@ The CAN-Bus connector plugs into one of the available sockets inside the system 
     * miwagner/ESP32CAN
     * homespan/HomeSpan
 - `config.h`
-    * Rename `config-sample.h` to `config.h`.
+    * Duplicate `config-sample.h` to `config.h`. (Do not check this file into git, it will have your wifi passowrd in it)
     * Enter Wifi SSID and password for your RV network.
     * Include a definition file for your RV devices (see `Miramar_2020_3202.h` for an example).
         * Each switch has:

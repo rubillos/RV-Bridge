@@ -1007,6 +1007,7 @@ bool wifiReady = false;
 void wifiConnected() {
 	wifiReady = true;
 }
+
 // print out if the HomeSpan status changes
 void statusUpdate(HS_STATUS status){
   Serial.printf("\n*** HOMESPAN STATUS CHANGE: %s\n",homeSpan.statusString(status));

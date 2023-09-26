@@ -1005,6 +1005,7 @@ void initPins() {
 bool wifiReady = false;
 
 void wifiConnected() {
+	Serial.printf("\nWi-Fi is connected. Address assigned.\n");
 	wifiReady = true;
 }
 
@@ -1034,12 +1035,44 @@ void setup() {
 	ESP32Can.CANInit();
 
 	printf("%d: Init HomeSpan\n", millis());
-	homeSpan.setWifiCredentials(ssid, sspwd);
+	homeSpan.enableWebLog(500,"pool.ntp.org","PDT","status");
+    homeSpan.setSerialInputDisable(false);
+	
+	#ifdef rb_accesspoint_ssid
+		#ifdef rb_accesspoint_pwd
+			homeSpan.setApSSID(rb_accesspoint_ssid);
+			homeSpan.setApPassword(rb_accesspoint_pwd);
+		#endif
+	#endif
+
+	#ifdef rb_accesspoint_autostart
+		if(rb_accesspoint_autostart==true) {
+			homeSpan.enableAutoStartAP();
+		}
+	#else
+	    // default to starting the AP if not defined
+		homeSpan.enableAutoStartAP();
+	#endif
+
+	#ifdef rb_wireless_ssid
+		#ifdef rb_wireless_password
+			printf ("%d: Setting WiFi credentials.", millis());
+			homeSpan.setWifiCredentials(rb_wireless_ssid, rb_wireless_password);
+		#endif
+	#endif
 	homeSpan.setSketchVersion(versionString);
 	homeSpan.setWifiCallback(wifiConnected);
 	homeSpan.setStatusCallback(statusUpdate);
-	homeSpan.begin(Category::Bridges, "RV-Bridge", DEFAULT_HOST_NAME, "RV-Bridge-ESP32");
+	
+	#ifdef rb_logLevel_override
+		homeSpan.setLogLevel(rb_logLevel_override);
+	#endif
 
+	#ifdef rb_hostname_override
+		homeSpan.begin(Category::Bridges, "RV-Bridge", rb_hostname_override, "RV-Bridge-ESP32");
+	#else
+		homeSpan.begin(Category::Bridges, "RV-Bridge", DEFAULT_HOST_NAME, "RV-Bridge-ESP32");
+	#endif
 	createDevices();
 	addCommands();
 

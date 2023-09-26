@@ -28,10 +28,27 @@
 #include <stdint.h>
 
 // #define OVERRIDE_MAC_ADDRESS {0x53, 0xC3, 0xD3, 0xBD, 0x20, 0x51}
+// define the setup Access Point settings here. To use the HomeSpan defaults comment out the next 2 lines
+#define rb_accesspoint_ssid "RVBridge-Setup"
+#define rb_accesspoint_pwd "444442220"
+#define rb_accesspoint_autostart false
 
-constexpr const char* ssid = "***";
-constexpr const char* sspwd = "***";
+//define a RV Bridge Hostname prefix (8 characters max.)
+// #define rb_hostname_override "Jayco-"
 
-constexpr uint8_t sourceAddress = 145;
+// To preconfigure a fixed SSID and Password for your Wi-Fi network, uncomment the 2 lines below
+// #define rb_wireless_ssid ""
+// #define rb_wireless_password ""
 
-#include "RV/Miramar_2020_3202.h"
+#define sourceAddress 145
+
+// set loglevel
+// sets the logging level for diagnostic messages, where:
+// 0 = top-level HomeSpan status messages, and any LOG0() messages specified in the sketch by the user (default)
+// 1 = all HomeSpan status messages, and any LOG1() messages specified in the sketch by the user
+// 2 = all HomeSpan status messages plus all HAP communication packets to and from the HomeSpan device, as well as all LOG1() and LOG2() messages specified in the sketch by the user
+// -1 = supresses ALL HomeSpan status messages, including all LOG0(), LOG1(), and LOG2() messages specified in the sketch by the user, freeing up the Serial port for other uses
+#define rb_logLevel_override 2
+
+// specify the RV model template you want to use
+#include "RV\Jayco_2023_Terrain.h"

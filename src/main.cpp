@@ -1036,6 +1036,8 @@ void setup() {
 
 	printf("%d: Init HomeSpan\n", millis());
 	homeSpan.enableWebLog(500,"pool.ntp.org","PDT","status");
+
+	// need to enable Serial Input so the AP will work
     homeSpan.setSerialInputDisable(false);
 	
 	#ifdef rb_accesspoint_ssid
@@ -1060,11 +1062,11 @@ void setup() {
 			homeSpan.setWifiCredentials(rb_wireless_ssid, rb_wireless_password);
 		#endif
 	#endif
+
 	homeSpan.setSketchVersion(versionString);
 	homeSpan.setWifiCallback(wifiConnected);
 	homeSpan.setStatusCallback(statusUpdate);
 
-	
 	#ifdef rb_logLevel_override
 		homeSpan.setLogLevel(rb_logLevel_override);
 	#endif

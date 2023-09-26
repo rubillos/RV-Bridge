@@ -1063,6 +1063,7 @@ void setup() {
 	homeSpan.setSketchVersion(versionString);
 	homeSpan.setWifiCallback(wifiConnected);
 	homeSpan.setStatusCallback(statusUpdate);
+
 	
 	#ifdef rb_logLevel_override
 		homeSpan.setLogLevel(rb_logLevel_override);
@@ -1073,6 +1074,7 @@ void setup() {
 	#else
 		homeSpan.begin(Category::Bridges, "RV-Bridge", DEFAULT_HOST_NAME, "RV-Bridge-ESP32");
 	#endif
+
 	createDevices();
 	addCommands();
 

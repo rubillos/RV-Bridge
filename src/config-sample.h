@@ -26,12 +26,14 @@
  ********************************************************************************/
  
 #include <stdint.h>
-
+// define a MAC address override for the RV Bridge
 // #define OVERRIDE_MAC_ADDRESS {0x53, 0xC3, 0xD3, 0xBD, 0x20, 0x51}
-// define the setup Access Point settings here. To use the HomeSpan defaults comment out the next 2 lines
+
+// define the setup Access Point settings here. To use the HomeSpan defaults comment out the next 2 lines.
+// to prevent the built-in access point to start when Wi-Fi credentials are needed set rb_accesspoint_autostart to false
 #define rb_accesspoint_ssid "RVBridge-Setup"
 #define rb_accesspoint_pwd "444442220"
-#define rb_accesspoint_autostart false
+#define rb_accesspoint_autostart true
 
 //define a RV Bridge Hostname prefix (8 characters max.)
 // #define rb_hostname_override "Jayco-"

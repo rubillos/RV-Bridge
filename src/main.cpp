@@ -1366,7 +1366,7 @@ void loop() {
 
 	bool sendIndicator = lastPacketSendTime < packetBlinkTime;
 	bool recvIndicator = lastPacketRecvTime < packetBlinkTime;
-
+    
 	if (sendIndicator || recvIndicator) {
 		heartbeatTime = heartbeatBlinkTime;		// adjust next heartbeat time to avoid overlap with send/recv indicators
 	}

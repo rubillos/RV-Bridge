@@ -163,8 +163,8 @@ The whole multiplex system connects back to a panel with outputs for all of the 
 Currently the project includes definition files for these RVs in the `RV` folder:
 
 [Miramar_2020_3202.h](/src/RV/Miramar_2020_3202.h) - 2020 Thor Miramar 32.2<br>
-[Aria_2019_3901.h](/src/RV/Aria_2019_3901.h) - 2019 Thor Aria 39.1
-[Tiffin_2019_34PA.h](/src/RV/Tiffin_2019_34PA.h) - 2019 Tiffin Open Road 34PA
+[Aria_2019_3901.h](/src/RV/Aria_2019_3901.h) - 2019 Thor Aria 39.1<br>
+[Tiffin_2019_34PA.h](/src/RV/Tiffin_2019_34PA.h) - 2019 Tiffin Open Road 34PA<br>
 [Jayco_2023_Terrain.h](/src/RV/Jayco_2023_Terrain.h) - 2023 Jayco Terrain 19Y
 
 (Additional definition files are welcome!)

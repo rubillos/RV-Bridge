@@ -27,7 +27,11 @@
  
 #include <stdint.h>
 
+// uncomment to set custom MAC_ADDRESS
 // #define OVERRIDE_MAC_ADDRESS {0x53, 0xC3, 0xD3, 0xBD, 0x20, 0x51}
+
+// uncomment to skip setting wifi credentials
+// #define SKIP_WIFI_CREDENTIALS
 
 constexpr const char* ssid = "***";
 constexpr const char* sspwd = "***";

@@ -58,8 +58,8 @@ constexpr uint32_t sendPacketIntervalmS = 50;
 constexpr uint32_t minSendPacketIntervalmS = 5;
 
 constexpr uint32_t packetBlinkTime = 25;
-constexpr uint32_t heatbeatRate = 2000;
-constexpr uint32_t heartbeatBlinkTime = 20;
+constexpr uint32_t heatbeatRate = 3000;
+constexpr uint32_t heartbeatBlinkTime = 10;
 
 elapsedMillis lastPacketSendTime = 1000;
 elapsedMillis lastPacketRecvTime = 1000;
@@ -111,6 +111,10 @@ constexpr uint32_t CHARGER_AC_STATUS_1 = 0x1FFCA;
 constexpr uint32_t INVERTER_STATUS = 0x1FFD4;
 constexpr uint32_t INVERTER_AC_STATUS_1 = 0x1FFD7;
 constexpr uint32_t DC_SOURCE_STATUS_2 = 0x1FFFC;
+
+constexpr uint32_t AWNING_STATUS = 0x1FEF3;
+constexpr uint32_t AWNING_COMMAND = 0x1FEF2;
+constexpr uint32_t AWNING_STATUS_2 = 0x1FDCD;
 
 //////////////////////////////////////////////
 
@@ -170,6 +174,47 @@ constexpr uint8_t HomeKitPercentMax = 100;
 
 //////////////////////////////////////////////
 
+constexpr float homeKitShadeOpenValue = 100.0;
+constexpr float homeKitShadeClosedValue = 0.0;
+
+constexpr uint8_t homeKitPositionStateClosing = 0;
+constexpr uint8_t homeKitPositionStateOpening = 1;
+constexpr uint8_t homeKitPositionStateStopped = 2;
+
+// constexpr float closePerMS = HomeKitPercentMax / closeTimeMS;
+// constexpr float openPerMS = HomeKitPercentMax / openTimeMS;
+
+constexpr uint32_t updateTimeMS = 500;
+constexpr uint32_t quickUpdateTimeMS = 100;
+
+typedef uint16_t ShadeState;
+constexpr uint16_t shadeStateOpen = 0;
+constexpr uint16_t shadeStateStopped = 1;
+constexpr uint16_t shadeStateClosed = 2;
+
+constexpr uint16_t shadeStateClosing = 1 << 3;
+constexpr uint16_t shadeStateOpening = 1 << 4;
+
+constexpr uint16_t shadeStateUserAction = 1 < 5;
+constexpr uint16_t shadeStateLocalAction = 1 << 6;
+constexpr uint16_t shadeStateHomeKitAction = 1 << 7;
+
+//////////////////////////////////////////////
+
+uint64_t millis64() {
+	volatile static uint32_t low32 = 0, high32 = 0;
+	uint32_t new_low32 = millis();
+
+	if (new_low32 < low32)
+		high32++;
+
+	low32 = new_low32;
+
+	return (uint64_t) high32 << 32 | low32;
+}
+
+//////////////////////////////////////////////
+
 uint32_t getMsgBits(uint32_t msg, int8_t startBit, int8_t numBits) {
 	int8_t shift = startBit - numBits + 1;
 	uint32_t mask = 0xFFFFFFFF >> (32 - numBits);
@@ -190,14 +235,16 @@ uint32_t makeMsg(uint32_t dgn, uint8_t sourceID=0, uint8_t priority=6) {
 constexpr double tempCOffset = -273.0;
 constexpr double tempCScale = 0.03125;
 constexpr double tempCScaleInv = 1.0 / tempCScale;
-constexpr double tempCRoundingOffset = 0.25;
+// constexpr double tempCRoundingOffset = 0.25;
+constexpr double tempCRoundingOffset = -0.25;
 
 double convToTempC(uint16_t value) {
 	return tempCOffset + value * tempCScale + tempCRoundingOffset;
 }
 
 uint16_t convFromTempC(double tempC) {
-	return (tempC - tempCOffset) * tempCScaleInv + 0.5;
+	// return (tempC - tempCOffset) * tempCScaleInv - 0.5;
+	return (tempC - tempCOffset + 0.5) / tempCScale;
 }
 
 //////////////////////////////////////////////
@@ -215,11 +262,11 @@ void processPacketQueue() {
 
 		if (lastPacketSendTime >= interval) {
 			if (doCANWrite) {
-				printf("%d: CAN-Bus Send Packet\n", millis());
+				printf("%u: CAN-Bus Send Packet\n", (uint32_t)millis());
 				ESP32Can.CANWriteFrame(&packetQueue[nextIndex]);
 			}
 			else {
-				printf("%d: ***SIMULATE*** CAN-Bus Send Packet\n", millis());
+				printf("%u: ***SIMULATE*** CAN-Bus Send Packet\n", (uint32_t)millis());
 			}
 			packetQueueTail = nextIndex;
 			lastPacketSendTime = 0;
@@ -264,13 +311,13 @@ void sendDCDimmerCmd(uint8_t index, uint8_t brightness, uint8_t cmd, uint8_t dur
 
 	queuePacket(&packet);
 
-	// printf("%d: Queueing Dimmer packet: #%d, bright=%d, cmd=%d, dur=%d\n", millis(), index, brightness, cmd, duration);
+	// printf("%u: Queueing Dimmer packet: #%d, bright=%d, cmd=%d, dur=%d\n", (uint32_t)millis(), index, brightness, cmd, duration);
 	// displayPacket(&packet, packetPrintYes);
-	// printf("%d: ** Packet queued.\n", millis());
+	// printf("%u: ** Packet queued.\n", (uint32_t)millis());
 }
 
 void sendOnOff(uint8_t index, bool on, uint8_t brightness=RVCBrightMax) {
-	printf("%d: sendOnOff: #%d to %d\n", millis(), index, on);
+	printf("%u: sendOnOff: #%d to %d\n", (uint32_t)millis(), index, on);
 	sendDCDimmerCmd(index, brightness, (on) ? DCDimmerCmdOnDuration : DCDimmerCmdOff);
 	// sendDCDimmerCmd(index, brightness, DCDimmerCmdToggle);
 }
@@ -280,7 +327,7 @@ void sendLampLevel(uint8_t index, uint8_t brightness) {
 		sendOnOff(index, false);
 	}
 	else {
-		printf("%d: sendLampLevel: #%d to %d\n", millis(), index, brightness);
+		printf("%u: sendLampLevel: #%d to %d\n", (uint32_t)millis(), index, brightness);
 		sendDCDimmerCmd(index, brightness, DCDimmerCmdSetBrightness, 0);
 	}
 }
@@ -299,9 +346,9 @@ void sendThermostatCommand(uint8_t index, ThermostatMode mode, FanMode fanMode, 
 
 	queuePacket(&packet);
 
-	// printf("%d: Queueing Thermostat packet: #%d, mode=%d, fanMode=%d, temp=%0.1fºC\n", millis(), index, mode, fanMode, tempC);
+	// printf("%u: Queueing Thermostat packet: #%d, mode=%d, fanMode=%d, temp=%0.1fºC\n", (uint32_t)millis(), index, mode, fanMode, tempC);
 	// displayPacket(&packet, packetPrintYes);
-	// printf("%d: ** Packet queued.\n", millis());
+	// printf("%u: ** Packet queued.\n", (uint32_t)millis());
 }
 
 //////////////////////////////////////////////
@@ -353,12 +400,12 @@ struct RVSwitch : SpanService {
 		uint16_t level = dcDimmerLevel * HomeKitPercentMax / RVCBrightMax;
 
 		if (index == _index && on != _on->getVal()) {
-			printf("%d: Switch #%d: on = %d\n", millis(), _index, on);
+			printf("%u: Switch #%d: on = %d\n", (uint32_t)millis(), _index, on);
 			_on->setVal(on);
 			lastPacketRecvTime = 0;
 		}
 		if (_brightness && index == _index && on && level != _brightness->getVal()) {
-			printf("%d: Switch #%d: level = %d\n", millis(), _index, level);
+			printf("%u: Switch #%d: level = %d\n", (uint32_t)millis(), _index, level);
 			_brightness->setVal(level);
 			lastPacketRecvTime = 0;
 		}
@@ -426,7 +473,7 @@ struct RVRoofFan : Service::Fan {
 			bool newState = _fanPower && (_upIndex==-1 || _lidUp);
 
 			if (newState != _active->getVal()) {
-				printf("%d: Fan #%d: active = %d\n", millis(), _index, newState);
+				printf("%u: Fan #%d: active = %d\n", (uint32_t)millis(), _index, newState);
 				_active->setVal(newState);
 			}
 		}
@@ -478,15 +525,15 @@ struct RVHVACFan : Service::Fan {
 		bool changed = false;
 
 		if (_active->updated()) {
-			printf("%d: RVHVACFan #%d - Active: %d\n", millis(), _index, _active->getNewVal());
+			printf("%u: RVHVACFan #%d - Active: %d\n", (uint32_t)millis(), _index, _active->getNewVal());
 			changed = true;
 		}
 		if (_speed->updated()) {
-			printf("%d: RVHVACFan #%d - Speed: %d\n", millis(), _index, _speed->getNewVal());
+			printf("%u: RVHVACFan #%d - Speed: %d\n", (uint32_t)millis(), _index, _speed->getNewVal());
 			changed = true;
 		}
 		if (_targetState->updated()) {
-			printf("%d: RVHVACFan #%d - Target State: %d\n", millis(), _index, _targetState->getNewVal());
+			printf("%u: RVHVACFan #%d - Target State: %d\n", (uint32_t)millis(), _index, _targetState->getNewVal());
 		}
 		if (changed) {
 			_updateFunction();
@@ -499,11 +546,11 @@ struct RVHVACFan : Service::Fan {
 		speed = speed * HomeKitPercentMax / RVCPercentMax;
 
 		if (newActive != _active->getVal()) {
-			printf("%d: RVHVACFan #%d - setActive: %d\n", millis(), _index, newActive);
+			printf("%u: RVHVACFan #%d - setActive: %d\n", (uint32_t)millis(), _index, newActive);
 			_active->setVal(newActive);
 		}
 		if (speed != _speed->getVal()) {
-			printf("%d: RVHVACFan #%d - setSpeed: %d\n", millis(), _index, speed);
+			printf("%u: RVHVACFan #%d - setSpeed: %d\n", (uint32_t)millis(), _index, speed);
 			_speed->setVal(speed);
 		}
 	}
@@ -538,7 +585,7 @@ struct RVHVACFan : Service::Fan {
 			uint8_t newState = (_fanHRunning || _fanLRunning) ? currentFanStateBlowing : currentFanStateIdle;
 
 			if (newState != _currentState->getVal()) {
-				printf("%d: HVACFan #%d: currentState = %d\n", millis(), _index, newState);
+				printf("%u: HVACFan #%d: currentState = %d\n", (uint32_t)millis(), _index, newState);
 				_currentState->setVal(newState);
 			}
 		}
@@ -589,7 +636,7 @@ struct RVThermostat : Service::Thermostat {
 	}
 
 	void updateThermostat() {
-		printf("%d: Thermostat #%d: Send thermostat info\n", millis(), _coolingInstance);
+		printf("%u: Thermostat #%d: Send thermostat info\n", (uint32_t)millis(), _coolingInstance);
 		ThermostatMode modeLookup[] { ThermostatModeOff, ThermostatModeHeat, ThermostatModeCool };
 		ThermostatMode opMode = modeLookup[_targetState->getNewVal()];
 		FanMode fanMode;
@@ -619,11 +666,11 @@ struct RVThermostat : Service::Thermostat {
 		bool sendInfo = false;
 
 		if (_targetState->updated()) {
-			printf("%d: RVThermostat #%d, Target State: %d\n", millis(), _coolingInstance, _targetState->getNewVal());
+			printf("%u: RVThermostat #%d, Target State: %d\n", (uint32_t)millis(), _coolingInstance, _targetState->getNewVal());
 			sendInfo = true;
 		}
 		if (_targetTemp->updated()) {
-			printf("%d: RVThermostat #%d - Target Temp: %f\n", millis(), _coolingInstance, _targetTemp->getNewVal<double>());
+			printf("%u: RVThermostat #%d - Target Temp: %f\n", (uint32_t)millis(), _coolingInstance, _targetTemp->getNewVal<double>());
 			sendInfo = true;
 		}
 		if (sendInfo) {
@@ -638,12 +685,12 @@ struct RVThermostat : Service::Thermostat {
 		bool changed = false;
 
 		if (index == _compressorIndex && on != _compressorRunning) {
-			printf("%d: Thermostat #%d: compressor = %d\n", millis(), index, on);
+			printf("%u: Thermostat #%d: compressor = %d\n", (uint32_t)millis(), index, on);
 			_compressorRunning = on;
 			changed = true;
 		}
 		if (index == _combustionIndex && on != _furnaceRunning) {
-			printf("%d: Thermostat #%d: furnace = %d\n", millis(), index, on);
+			printf("%u: Thermostat #%d: furnace = %d\n", (uint32_t)millis(), index, on);
 			_furnaceRunning = on;
 			changed = true;
 		}
@@ -669,7 +716,7 @@ struct RVThermostat : Service::Thermostat {
 
 	void setAmbientTemp(uint8_t index, double tempC) {
 		if (index == _coolingInstance && fabs(tempC - _ambientTemp->getVal<double>()) > 0.2) {
-			printf("%d: Set ambient temp #%d: %0.1fºC\n", millis(), _coolingInstance, tempC);
+			printf("%u: Set ambient temp #%d: %0.1fºC\n", (uint32_t)millis(), _coolingInstance, tempC);
 			_ambientTemp->setVal(tempC);
 			lastPacketRecvTime = 0;
 		}
@@ -684,7 +731,7 @@ struct RVThermostat : Service::Thermostat {
 				updateMode = true;
 			}
 			if (fabs(coolTemp - _targetTemp->getVal<double>()) > 0.2) {
-				printf("%d: Thermostat #%d: targetTemp = %f\n", millis(), index, coolTemp);
+				printf("%u: Thermostat #%d: targetTemp = %f\n", (uint32_t)millis(), index, coolTemp);
 				_targetTemp->setVal(coolTemp);
 				lastPacketRecvTime = 0;
 			}
@@ -711,7 +758,7 @@ struct RVThermostat : Service::Thermostat {
 			}
 
 			if (mode != _targetState->getVal()) {
-				printf("%d: Thermostat #%d: targetState = %d\n", millis(), index, mode);
+				printf("%u: Thermostat #%d: targetState = %d\n", (uint32_t)millis(), index, mode);
 				_targetState->setVal(mode);
 				lastPacketRecvTime = 0;
 			}
@@ -759,24 +806,29 @@ void setThermostatInfo(uint8_t index, ThermostatMode opMode, FanMode fanMode, ui
 
 //////////////////////////////////////////////
 
+#ifndef HAVE_AWNINGS
+const AwningDeviceRec awningList[] = {
+};
+#endif
+
 void createDevices() {
 	SPAN_ACCESSORY();   // create Bridge
 
 		const char* typeNames[] = { "Lamp", "Dimmable", "Switch" };
 		for (SwitchDeviceRec device : switchList) {
-			printf("%d: Creating %s #%d: \"%s\"\n", millis(), typeNames[device.type], device.index, device.name);
+			printf("%u: Creating %s #%d: \"%s\"\n", (uint32_t)millis(), typeNames[device.type], device.index, device.name);
 			SPAN_ACCESSORY(device.name);
 				switches[switchCount++] = new RVSwitch(&device);
 		}
 
 		for (FanDeviceRec fan : fanList) {
-			printf("%d: Creating Fan #%d: \"%s\"\n", millis(), fan.index, fan.name);
+			printf("%u: Creating Fan #%d: \"%s\"\n", (uint32_t)millis(), fan.index, fan.name);
 			SPAN_ACCESSORY(fan.name);
 				fans[fanCount++] = new RVRoofFan(&fan);
 		}
 
 		for (ThermostatDeviceRec thermostat : thermostatList) {
-			printf("%d: Creating Thermostat #%d: \"%s\"\n", millis(), thermostat.coolingInstance, thermostat.name);
+			printf("%u: Creating Thermostat #%d: \"%s\"\n", (uint32_t)millis(), thermostat.coolingInstance, thermostat.name);
 			SPAN_ACCESSORY(thermostat.name);
 				thermostats[thermostatCount++] = new RVThermostat(&thermostat);
 		}
@@ -832,11 +884,11 @@ void cmdSet(const char *buff, uint8_t multiplier, const char* label) {
 		buff = getValuePair(buff, &index, &val);
 
 		if (index!=-1 && val!=-1) {
-			printf("%d: %s: index=%d, val=%d\n", millis(), label, index, val);
+			printf("%u: %s: index=%d, val=%d\n", (uint32_t)millis(), label, index, val);
 			setSwitchLevel(index, val*multiplier);
 		}
 		else {
-			printf("%d: %s: parameter error!\n", millis(), label);
+			printf("%u: %s: parameter error!\n", (uint32_t)millis(), label);
 		}
 	}
 }
@@ -860,11 +912,11 @@ void cmdSetAmbient(const char *buff) {
 
 		if (index!=-1 && tempF!=-1) {
 			double tempC = (tempF - 32.0) / 1.8;
-			printf("%d: cmdSetAmbient: index=%d, tempF=%dºF (%0.1fºC)\n", millis(), index, tempF, tempC);
+			printf("%u: cmdSetAmbient: index=%d, tempF=%dºF (%0.1fºC)\n", (uint32_t)millis(), index, tempF, tempC);
 			setAmbientTemp(index, tempC);
 		}
 		else {
-			printf("%d: cmdSetAmbient: parameter error!\n", millis());
+			printf("%u: cmdSetAmbient: parameter error!\n", (uint32_t)millis());
 		}
 	}
 }
@@ -892,11 +944,11 @@ void cmsSetThermostat(const char *buff) {
 
 	if (index!=-1 && opMode!=-1 && fanMode!=-1 && fanSpeed!=-1 && tempF!=-1) {
 		double tempC = (tempF - 32.0) / 1.8;
-		printf("%d: cmsSetThermostat: index=%d, mode=%d, temp=%dºF (%0.1fºC), fanMode=%d, fanSpeed=%d\n", millis(), index, opMode, tempF, tempC, fanMode, fanSpeed);
+		printf("%u: cmsSetThermostat: index=%d, mode=%d, temp=%dºF (%0.1fºC), fanMode=%d, fanSpeed=%d\n", (uint32_t)millis(), index, opMode, tempF, tempC, fanMode, fanSpeed);
 		setThermostatInfo(index, (ThermostatMode)opMode, (FanMode)fanMode, fanSpeed, tempC, tempC);
 	}
 	else {
-		printf("%d: cmsSetThermostat: parameter error!\n", millis());
+		printf("%u: cmsSetThermostat: parameter error!\n", (uint32_t)millis());
 	}
 }
 
@@ -910,11 +962,11 @@ void cmdSendOnOff(const char *buff) {
 		buff = getValuePair(buff, &index, &val);
 
 		if (index!=-1 && val!=-1) {
-			printf("%d: cmdSendOnOff: index=%d, val=%d\n", millis(), index, val);
+			printf("%u: cmdSendOnOff: index=%d, val=%d\n", (uint32_t)millis(), index, val);
 			sendOnOff(index, val);
 		}
 		else {
-			printf("%d: cmdSendOnOff: parameter error!\n", millis());
+			printf("%u: cmdSendOnOff: parameter error!\n", (uint32_t)millis());
 		}
 	}
 }
@@ -926,14 +978,14 @@ void cmdSetCANWrite(const char *buff) {
 	switch (buff[0]) {
 		case '0':
 			doCANWrite = false;
-			printf("%d: CAN-Bus packet writes DISABLED.\n", millis());
+			printf("%u: CAN-Bus packet writes DISABLED.\n", (uint32_t)millis());
 			break;
 		case '1':
 			doCANWrite = true;
-			printf("%d: CAN-Bus packet writes ENABLED.\n", millis());
+			printf("%u: CAN-Bus packet writes ENABLED.\n", (uint32_t)millis());
 			break;
 		default:
-			printf("%d: cmdSetCANWrite: parameter error!\n", millis());
+			printf("%u: cmdSetCANWrite: parameter error!\n", (uint32_t)millis());
 	}
 }
 
@@ -944,22 +996,22 @@ void cmdSetPacketLog(const char *buff) {
 	switch (buff[0]) {
 		case '0':
 			packetPrintMode = packetPrintNo;
-			printf("%d: Packet logging: Off.\n", millis());
+			printf("%u: Packet logging: Off.\n", (uint32_t)millis());
 			break;
 		case '1':
 			packetPrintMode = packetPrintYes;
-			printf("%d: Packet logging: On.\n", millis());
+			printf("%u: Packet logging: On.\n", (uint32_t)millis());
 			break;
 		case '2':
 			packetPrintMode = packetPrintIfUnknown;
-			printf("%d: Packet logging: If Unknown.\n", millis());
+			printf("%u: Packet logging: If Unknown.\n", (uint32_t)millis());
 			break;
 		case '3':
 			packetPrintMode = packetPrintIfKnown;
-			printf("%d: Packet logging: If Known.\n", millis());
+			printf("%u: Packet logging: If Known.\n", (uint32_t)millis());
 			break;
 		default:
-			printf("%d: cmdSetPacketLog: parameter error!\n", millis());
+			printf("%u: cmdSetPacketLog: parameter error!\n", (uint32_t)millis());
 	}
 }
 
@@ -1002,42 +1054,64 @@ void initPins() {
 	}
 }
 
-bool wifiReady = false;
+//////////////////////////////////////////////
 
-void wifiConnected() {
-	wifiReady = true;
+bool wifiConnected = false;
+bool hadWifiConnection = false;
+
+void wifiStatusChanged(HS_STATUS status) {
+	if (status == HS_WIFI_CONNECTING) {
+		wifiConnected = false;
+		if (hadWifiConnection) {
+			printf("%u: WIFI: Lost Connection..\n", (uint32_t)millis());
+		}
+	}
 }
+
+void wifiReady() {
+	wifiConnected = true;
+	hadWifiConnection = true;
+	printf("%u: WIFI: Ready..\n", (uint32_t)millis());
+}
+
+//////////////////////////////////////////////
 
 void setup() {
 	initPins();
 	flashPin(indicatorPinB, 20, 200);
 
 	Serial.begin(115200);
-	printf("%d: RV Bridge - Startup\n", millis());
+	printf("%u: RV Bridge - Startup\n", (uint32_t)millis());
 
 	#ifdef OVERRIDE_MAC_ADDRESS
  		uint8_t newMACAddress[] = OVERRIDE_MAC_ADDRESS;
  		esp_base_mac_addr_set(&newMACAddress[0]);
- 		printf("%d: MAC address updated to: %s\n", millis(), WiFi.macAddress().c_str());
+ 		printf("%u: MAC address updated to: %s\n", (uint32_t)millis(), WiFi.macAddress().c_str());
  	#endif
 
-	printf("%d: Init CAN module\n", millis());
+	printf("%u: Init CAN module\n", (uint32_t)millis());
 	CAN_cfg.speed = CAN_SPEED_250KBPS;
 	CAN_cfg.tx_pin_id = canTxPin;
 	CAN_cfg.rx_pin_id = canRxPin;
 	CAN_cfg.rx_queue = xQueueCreate(receiveQueueSize, sizeof(CAN_frame_t));
 	ESP32Can.CANInit();
 
-	printf("%d: Init HomeSpan\n", millis());
-	homeSpan.setWifiCredentials(ssid, sspwd);
+	printf("%u: Init HomeSpan\n", (uint32_t)millis());
+	#ifndef SKIP_WIFI_CREDENTIALS
+		homeSpan.setWifiCredentials(ssid, sspwd);
+	#endif
 	homeSpan.setSketchVersion(versionString);
-	homeSpan.setWifiCallback(wifiConnected);
+	homeSpan.setWifiCallback(wifiReady);
+	homeSpan.setStatusCallback(wifiStatusChanged);
 	homeSpan.begin(Category::Bridges, "RV-Bridge", DEFAULT_HOST_NAME, "RV-Bridge-ESP32");
 
 	createDevices();
 	addCommands();
 
-	printf("%d: Init complete.\n", millis());
+	// Reduce processor frequency to lower current consumption
+	setCpuFrequencyMhz(160);
+
+	printf("%u: Init complete.\n", (uint32_t)millis());
 }
 
 //////////////////////////////////////////////
@@ -1045,19 +1119,19 @@ void setup() {
 void processPacket(CAN_frame_t *packet) {
 	if (packet->FIR.B.RTR != CAN_RTR) {
 		uint32_t dgn = getMsgBits(packet->MsgID, 24, 17);
-		uint8_t sourceAddr = getMsgBits(packet->MsgID, 7, 8);
-		uint8_t priority = getMsgBits(packet->MsgID, 28, 3);
+		// uint8_t sourceAddr = getMsgBits(packet->MsgID, 7, 8);
+		// uint8_t priority = getMsgBits(packet->MsgID, 28, 3);
 
 		uint8_t* d = packet->data.u8;
 
 		if (dgn == DC_DIMMER_STATUS_3) {
 			uint8_t instance = d[0];
-			uint8_t group = d[1];
+			// uint8_t group = d[1];
 			uint8_t brightness = min(d[2], RVCBrightMax);
-			uint8_t enable = (d[3] >> 6) & 3;
-			uint8_t delayDuration = d[4];
-			DCDimmerCmd lastCmd = (DCDimmerCmd)d[5];
-			uint8_t status = (d[6] >> 2) & 3;
+			// uint8_t enable = (d[3] >> 6) & 3;
+			// uint8_t delayDuration = d[4];
+			// DCDimmerCmd lastCmd = (DCDimmerCmd)d[5];
+			// uint8_t status = (d[6] >> 2) & 3;
 
 			// if (instance == 4) {
 			// 	displayPacket(packet, packetPrintYes);
@@ -1074,7 +1148,7 @@ void processPacket(CAN_frame_t *packet) {
 			uint8_t instance = d[0];
 			ThermostatMode opMode = (ThermostatMode)(d[1] & 0x0F);
 			FanMode fanMode = (FanMode)((d[1]>>4) & 0x03);
-			uint8_t scheduleEnabled = ((d[1]>>6) & 0x03);
+			// uint8_t scheduleEnabled = ((d[1]>>6) & 0x03);
 			uint8_t fanSpeed = d[2];
 			double heatTemp = convToTempC(d[4]<<8 | d[3]);
 			double coolTemp = convToTempC(d[6]<<8 | d[5]);
@@ -1097,7 +1171,7 @@ void displayPacket(CAN_frame_t *packet, uint8_t printPacket) {
 	bool knownPacket = true;
 
 	if (packet->FIR.B.RTR == CAN_RTR) {
-		printf("%d: RTR from 0x%08X, DLC %d\r\n", millis(), packet->MsgID,  packet->FIR.B.DLC);
+		printf("%u: RTR from 0x%08X, DLC %d\r\n", (uint32_t)millis(), packet->MsgID,  packet->FIR.B.DLC);
 	}
 	else {
 		uint32_t dgn = getMsgBits(packet->MsgID, 24, 17);
@@ -1106,18 +1180,7 @@ void displayPacket(CAN_frame_t *packet, uint8_t printPacket) {
 
 		uint8_t* d = packet->data.u8;
 
-		if (dgn == DATE_TIME_STATUS) {
-			// uint8_t year = d[0];
-			// uint8_t month = d[1];
-			// uint8_t day = d[2];
-			// uint8_t dayOfWeek = d[3];
-			// uint8_t hour = d[4];
-			// uint8_t minute = d[5];
-			// uint8_t second = d[6];
-			// uint8_t timeZone = d[7];
-
-		}
-		else if (dgn == DC_DIMMER_STATUS_3) {
+		if (dgn == DC_DIMMER_STATUS_3) {
 			uint8_t instance = d[0];
 			uint8_t group = d[1];
 			uint8_t brightness = min(d[2], RVCBrightMax);
@@ -1127,7 +1190,7 @@ void displayPacket(CAN_frame_t *packet, uint8_t printPacket) {
 			uint8_t status = (d[6] >> 2) & 3;
 
 			if (printPacket==packetPrintYes || printPacket==packetPrintIfKnown) {
-				printf("%d: DC_DIMMER_STATUS_3: inst=%d, grp=0X%02X, bright=%d, enable=%d, dur=%d, last cmd=%d, status=0X%02X\n", millis(), instance, group, brightness, enable, delayDuration, lastCmd, status);				
+				printf("%u: DC_DIMMER_STATUS_3: inst=%d, grp=0X%02X, bright=%d, enable=%d, dur=%d, last cmd=%d, status=0X%02X\n", (uint32_t)millis(), instance, group, brightness, enable, delayDuration, lastCmd, status);				
 			}
 		}
 		else if (dgn == DC_DIMMER_COMMAND_2) {
@@ -1142,7 +1205,7 @@ void displayPacket(CAN_frame_t *packet, uint8_t printPacket) {
 			// }
 
 			if (printPacket==packetPrintYes || printPacket==packetPrintIfKnown) {
-				printf("%d: DC_DIMMER_COMMAND_2: inst=%d, grp=0X%02X, bright=%d, cmd=0X%02X, dur=%d\n", millis(), instance, group, brightness, cmd, delayDuration);	
+				printf("%u: DC_DIMMER_COMMAND_2: inst=%d, grp=0X%02X, bright=%d, cmd=0X%02X, dur=%d\n", (uint32_t)millis(), instance, group, brightness, cmd, delayDuration);	
 				printPacket = packetPrintYes;			
 			}
 		}
@@ -1151,14 +1214,14 @@ void displayPacket(CAN_frame_t *packet, uint8_t printPacket) {
 			double tempC = convToTempC(d[2]<<8 | d[1]);
 			
 			if (printPacket==packetPrintYes || printPacket==packetPrintIfKnown) {
-				printf("%d: THERMOSTAT_AMBIENT_STATUS: #%d, temp=%0.1fºC\n", millis(), instance, tempC);
+				printf("%u: THERMOSTAT_AMBIENT_STATUS: #%d, temp=%0.1fºC\n", (uint32_t)millis(), instance, tempC);
 			}
 		}
 		else if (dgn == THERMOSTAT_STATUS_1 || dgn == THERMOSTAT_COMMAND_1) {
 			uint8_t instance = d[0];
 			ThermostatMode opMode = (ThermostatMode)(d[1] & 0x0F);
 			FanMode fanMode = (FanMode)((d[1]>>4) & 0x03);
-			uint8_t scheduleEnabled = ((d[1]>>6) & 0x03);
+			// uint8_t scheduleEnabled = ((d[1]>>6) & 0x03);
 			uint8_t fanSpeed = d[2];
 			double heatTemp = convToTempC(d[4]<<8 | d[3]);
 			double coolTemp = convToTempC(d[6]<<8 | d[5]);
@@ -1166,19 +1229,8 @@ void displayPacket(CAN_frame_t *packet, uint8_t printPacket) {
 			const char* name = (dgn == THERMOSTAT_COMMAND_1) ? "THERMOSTAT_COMMAND_1" : "THERMOSTAT_STATUS_1";
 			
 			if (printPacket==packetPrintYes || printPacket==packetPrintIfKnown) {
-				printf("%d: %s: inst=%d, opMode=%d, fanMode=%d, fanSpeed=%d, heatTemp=%0.1fºC, coolTemp=%0.1fºC\n", millis(), name, instance, opMode, fanMode, fanSpeed, heatTemp, coolTemp);
+				printf("%u: %s: inst=%d, opMode=%d, fanMode=%d, fanSpeed=%d, heatTemp=%0.1fºC, coolTemp=%0.1fºC\n", (uint32_t)millis(), name, instance, opMode, fanMode, fanSpeed, heatTemp, coolTemp);
 			}
-		}
-		else if (dgn == AIR_CONDITIONER_STATUS) {
-			uint8_t instance = d[0];
-			ACMode opMode = (ACMode)d[1];
-			uint8_t maxFanSpeed = d[2];
-			uint8_t maxOutputLevel = d[3];
-			uint8_t fanSpeed = d[4];
-			uint8_t outputLevel = d[5];
-			uint8_t deadBand = d[6];
-			uint8_t deadBand2 = d[7];
-			
 		}
 		else if (dgn == FURNACE_STATUS || dgn == FURNACE_COMMAND) {
 			uint8_t instance = d[0];
@@ -1189,61 +1241,54 @@ void displayPacket(CAN_frame_t *packet, uint8_t printPacket) {
 			const char* name = (dgn == FURNACE_COMMAND) ? "FURNACE_COMMAND" : "FURNACE_STATUS";
 
 			if (printPacket==packetPrintYes || printPacket==packetPrintIfKnown) {
-				printf("%d: %s: inst=%d, opMode=%d, fanSpeed=%d, heatOutput=%d\n", millis(), name, instance, opMode, fanSpeed, heatOutput);
+				printf("%u: %s: inst=%d, opMode=%d, fanSpeed=%d, heatOutput=%d\n", (uint32_t)millis(), name, instance, opMode, fanSpeed, heatOutput);
 			}
 		}
-		else if (dgn == GENERIC_INDICATOR_COMMAND) {
-			// printf("%d: GENERIC_INDICATOR_COMMAND: inst=%d, grp=0X%02X, bright=%d, bank=%d, dur=%d, func=%d\n", millis(), d[0], d[1], d[2], d[3], d[4], d[6]);
-		}
-		else if (dgn == GENERIC_CONFIGURATION_STATUS) {
-			
-		}
-		else if (dgn == DC_SOURCE_STATUS_1) {
-			
-		}
-		else if (dgn == TANK_STATUS) {
-			
-		}
-		else if (dgn == GENERATOR_STATUS_1) {
-			
-		}
-		else if (dgn == 0x0FECA) { // DM_1 - 1FECA - DM_RV
+		else if (dgn == DC_LOAD_COMMAND) {
+			uint8_t instance = d[0];
+			uint8_t group = d[1];
+			uint8_t brightness = min(d[2], RVCBrightMax);
+			uint8_t direction = (d[3] >> 4) & 0xF;
+			uint8_t command = d[4];
 
+			printf("%u: DC_LOAD_COMMAND: inst=%d, grp=0X%02X, bright=%d, dir=%d, cmd=%d\n", (uint32_t)millis(), instance, group, brightness, direction, command);				
 		}
-		else if (dgn == 0x0E8FF) {
-			
+		else if (dgn == AWNING_COMMAND) {
+			uint8_t instance = d[0];
+			uint8_t direction = d[2];
+			uint8_t position = d[3];
+			uint8_t retract = d[5];
+
+			printf("%u: AWNING_COMMAND: inst=%d, dir=%d, pos=%d, retract=%d\n", (uint32_t)millis(), instance, direction, position, retract);			
 		}
-		else if (dgn == 0x0EAFF) {
-			
-		}
-		else if (dgn == 0x15FCE) {
-			
-		}
-		else if (dgn == 0x1AAFD) {
-			
-		}
-		else if (dgn == 0x1BBFD) {
-			
-		}
-		else if (dgn == 0x1FACE) {
-			
-		}
-		else if (dgn == 0x1FACF) {
-			
-		}
-		else if (dgn == 0x1FBDA) {
-			
-		}
+		else if (dgn == AIR_CONDITIONER_STATUS) { }
+		else if (dgn == AWNING_STATUS) { }
+		else if (dgn == AWNING_STATUS_2) { }
+		else if (dgn == DATE_TIME_STATUS) { }
+		else if (dgn == GENERIC_INDICATOR_COMMAND) { }
+		else if (dgn == GENERIC_CONFIGURATION_STATUS) { }
+		else if (dgn == DC_SOURCE_STATUS_1) { }
+		else if (dgn == TANK_STATUS) { }
+		else if (dgn == GENERATOR_STATUS_1) { }
+		else if (dgn == 0x0FECA) { /* DM_1 - 1FECA - DM_RV */ }
+		else if (dgn == 0x0E8FF) { }
+		else if (dgn == 0x0EAFF) { }
+		else if (dgn == 0x15FCE) { }
+		else if (dgn == 0x1AAFD) { }
+		else if (dgn == 0x1BBFD) { }
+		else if (dgn == 0x1FACE) { }
+		else if (dgn == 0x1FACF) { }
+		else if (dgn == 0x1FBDA) { }
 		else {
 			knownPacket = false;
 		}
 
 		if (printPacket==packetPrintYes || (!knownPacket && printPacket==packetPrintIfUnknown) || (knownPacket && printPacket==packetPrintIfKnown)) {
 			if (packet->FIR.B.FF == CAN_frame_std) {
-				printf("%d: Std - ", millis());
+				printf("%u: Std - ", (uint32_t)millis());
 			}
 			else {
-				printf("%d: Ext - ", millis());
+				printf("%u: Ext - ", (uint32_t)millis());
 			}
 
 			printf("dgn=%05X, src=%02X, pri=%d, Data: ", dgn, sourceAddr, priority);
@@ -1252,6 +1297,64 @@ void displayPacket(CAN_frame_t *packet, uint8_t printPacket) {
 				printf("%02X ", packet->data.u8[i]);
 			}
 			printf("\n");
+		}
+	}
+}
+
+void debugPacket(CAN_frame_t *packet) {
+	if (packet->FIR.B.RTR != CAN_RTR) {
+		uint32_t dgn = getMsgBits(packet->MsgID, 24, 17);
+		uint8_t sourceAddr = getMsgBits(packet->MsgID, 7, 8);
+		uint8_t priority = getMsgBits(packet->MsgID, 28, 3);
+
+		uint8_t* d = packet->data.u8;
+
+		if (dgn == DC_LOAD_COMMAND) {
+			uint8_t instance = d[0];
+			uint8_t group = d[1];
+			uint8_t brightness = min(d[2], RVCBrightMax);
+			uint8_t direction = (d[3] >> 4) & 0xF;
+			uint8_t command = d[4];
+
+			printf("%u: DC_LOAD_COMMAND: inst=%d, grp=0X%02X, bright=%d, dir=%d, cmd=%d\n", (uint32_t)millis(), instance, group, brightness, direction, command);				
+		}
+		else if (dgn == AWNING_COMMAND) {
+			uint8_t instance = d[0];
+			uint8_t direction = d[2];
+			uint8_t position = d[3];
+			uint8_t retract = d[5];
+
+			printf("%u: AWNING_COMMAND: inst=%d, dir=%d, pos=%d, retract=%d\n", (uint32_t)millis(), instance, direction, position, retract);			
+		}
+		else if (dgn == AWNING_STATUS) {
+			printf("%u: AWNING_STATUS\n", (uint32_t)millis());
+		}
+		else if (dgn == AWNING_STATUS_2) {
+			printf("%u: AWNING_STATUS_2\n", (uint32_t)millis());			
+		}
+		else if (dgn == DC_DIMMER_STATUS_3) {
+			uint8_t instance = d[0];
+			uint8_t group = d[1];
+			uint8_t brightness = min(d[2], RVCBrightMax);
+			uint8_t enable = (d[3] >> 6) & 3;
+			uint8_t delayDuration = d[4];
+			DCDimmerCmd lastCmd = (DCDimmerCmd)d[5];
+			uint8_t status = (d[6] >> 2) & 3;
+
+			if (instance == 5 || instance == 6) {
+				printf("%u: DC_DIMMER_STATUS - AWNING: inst=%d, grp=0X%02X, bright=%d, enable=%d, dur=%d, last cmd=%d, status=0X%02X\n", (uint32_t)millis(), instance, group, brightness, enable, delayDuration, lastCmd, status);				
+			}
+		}
+		else if (dgn == DC_DIMMER_COMMAND_2) {
+			uint8_t instance = d[0];
+			uint8_t group = d[1];
+			uint8_t brightness = d[2];
+			DCDimmerCmd cmd = (DCDimmerCmd)d[3];
+			uint8_t delayDuration = d[4];
+
+			if (instance == 5 || instance == 6) {
+				printf("%u: DC_DIMMER_COMMAND - AWNING: inst=%d, grp=0X%02X, bright=%d, cmd=0X%02X, dur=%d\n", (uint32_t)millis(), instance, group, brightness, cmd, delayDuration);	
+			}
 		}
 	}
 }
@@ -1270,7 +1373,7 @@ void loop() {
 
 	bool hearbeatIndicator = (heartbeatTime % heatbeatRate) < heartbeatBlinkTime;
 
-	if (!wifiReady) {
+	if (!wifiConnected) {
 		hearbeatIndicator = (heartbeatTime % (heatbeatRate/4)) > heartbeatBlinkTime*5;
 	}
 
@@ -1280,12 +1383,28 @@ void loop() {
 
 	homeSpan.poll();
 
+	// HomeSpan does not call the wifi callback after the first connection
+	// We do that manually here
+	if (hadWifiConnection && !wifiConnected) {
+		static uint64_t nextWifiCheck = 0;
+		uint64_t time = millis64();
+
+		if (time >= nextWifiCheck) {
+			if (WiFi.status()==WL_CONNECTED) {
+				wifiReady();
+			}
+
+			nextWifiCheck = time + 500;
+		}
+	}
+
 	CAN_frame_t packet;
 
 	if (xQueueReceive(CAN_cfg.rx_queue, &packet, 0) == pdTRUE) {
 		if (packetPrintMode != packetPrintNo) {
 			displayPacket(&packet, packetPrintMode);
 		}
+		debugPacket(&packet);
 		processPacket(&packet);
 	}
 

@@ -62,4 +62,12 @@ typedef struct {
     const char* name;
 } ThermostatDeviceRec;
 
+typedef struct {
+    int16_t extendIndex;
+    int16_t retractIndex;
+    uint32_t extendTime;
+    uint32_t retractTime;
+    const char* name;
+} AwningDeviceRec;
+
 #endif

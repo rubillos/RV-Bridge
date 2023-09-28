@@ -56,3 +56,9 @@ const ThermostatDeviceRec thermostatList[] = {
     0, 25, 26, 27, 2, 33, "Front",
     1, 29, 30, 31, -1, -1, "Back"
 };
+
+// extendIndex, retractIndex, extendTime, retractTime, name
+#define HAVE_AWNINGS
+const AwningDeviceRec awningList[] = {
+    5, 6, 10*1000, 10*1000, "Awning"
+};

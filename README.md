@@ -37,7 +37,7 @@ At the start of the pandemic we realized that international travel was going to 
 
 In addition to a bunch of 3D printed upgrades (we travel with a Prusa MK3S on board), I've done some arduino powered electronics work: a water valve for a reverse osmosis water filter with an LCD control panel, a GPS based clock for the bedroom that knows the exact timezone boundaries so it never needs to be set, and a GPS based altimeter and tire pressure monitor with a 7" color touchscreen for the dash.
 
-The RV's lights, fans, and climate are all controlled through a [Firefly Integrations](https://fireflyint.com) [Vegatouch Spectrum](https://www.vegatouch.com) multiplex system. A 10" LCD panel is used to control everything, in addition to wireless keypads around the RV. There is also a bluetooth module that connects to an iOS app for controlling via an iPhone.
+The RV's lights, fans, and climate are all controlled through a [Firefly Integrations](https://fireflyint.com) [Vegatouch Spectrum](https://www.vegatouch.com) multiplex system. A 7" LCD panel is used to control everything, in addition to wireless keypads around the RV. There is also a bluetooth module that connects to an iOS app for controlling via an iPhone.
 
 |   |   |
 | --- | --- |
@@ -164,6 +164,8 @@ Currently the project includes definition files for these RVs in the `RV` folder
 
 [Miramar_2020_3202.h](/src/RV/Miramar_2020_3202.h) - 2020 Thor Miramar 32.2<br>
 [Aria_2019_3901.h](/src/RV/Aria_2019_3901.h) - 2019 Thor Aria 39.1
+[Tiffin_2019_34PA.h](/src/RV/Tiffin_2019_34PA.h) - 2019 Tiffin Open Road 34PA
+[Jayco_2023_Terrain.h](/src/RV/Jayco_2023_Terrain.h) - 2023 Jayco Terrain 19Y
 
 (Additional definition files are welcome!)
 

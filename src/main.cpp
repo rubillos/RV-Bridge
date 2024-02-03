@@ -110,11 +110,12 @@ constexpr uint32_t AC_LOAD_STATUS = 0x1FFBF;
 constexpr uint32_t CHARGER_AC_STATUS_1 = 0x1FFCA;
 constexpr uint32_t INVERTER_STATUS = 0x1FFD4;
 constexpr uint32_t INVERTER_AC_STATUS_1 = 0x1FFD7;
-constexpr uint32_t DC_SOURCE_STATUS_2 = 0x1FFFC;
 
 constexpr uint32_t AWNING_STATUS = 0x1FEF3;
 constexpr uint32_t AWNING_COMMAND = 0x1FEF2;
 constexpr uint32_t AWNING_STATUS_2 = 0x1FDCD;
+
+constexpr uint32_t BATTERY_STATUS = 0x1AAFD;
 
 //////////////////////////////////////////////
 
@@ -181,6 +182,9 @@ constexpr uint8_t homeKitPositionStateClosing = 0;
 constexpr uint8_t homeKitPositionStateOpening = 1;
 constexpr uint8_t homeKitPositionStateStopped = 2;
 
+constexpr uint8_t homeKitTemperatureDisplayCelsius = 0;
+constexpr uint8_t homeKitTemperatureDisplayFahrenheit = 1;
+
 // constexpr float closePerMS = HomeKitPercentMax / closeTimeMS;
 // constexpr float openPerMS = HomeKitPercentMax / openTimeMS;
 
@@ -243,7 +247,6 @@ double convToTempC(uint16_t value) {
 }
 
 uint16_t convFromTempC(double tempC) {
-	// return (tempC - tempCOffset) * tempCScaleInv - 0.5;
 	return (tempC - tempCOffset + 0.5) / tempCScale;
 }
 
@@ -614,10 +617,10 @@ struct RVThermostat : Service::Thermostat {
 	RVThermostat(ThermostatDeviceRec *device) : Service::Thermostat() {
 		_ambientTemp = new Characteristic::CurrentTemperature(20);
 		_targetTemp = new Characteristic::TargetTemperature();
-		_targetTemp->setRange(10, 32, 0.5)->setVal(20);
+		_targetTemp->setRange(10, 32, (1.0 / 1.8))->setVal(20);
 		_currentState = new Characteristic::CurrentHeatingCoolingState(heatingCoolingStateOff);
 		_targetState = new Characteristic::TargetHeatingCoolingState(heatingCoolingStateOff);
-		new Characteristic::TemperatureDisplayUnits(1);
+		new Characteristic::TemperatureDisplayUnits(homeKitTemperatureDisplayFahrenheit);
 
 		if (device->furnaceInstance != -1) {
 			_targetState->setValidValues(3, heatingCoolingStateOff, heatingCoolingStateHeat, heatingCoolingStateCool);
@@ -768,17 +771,272 @@ struct RVThermostat : Service::Thermostat {
 
 //////////////////////////////////////////////
 
+inline float degCfromDegF(float degF) {
+	return degF / 1.8;
+}
+
+inline float tempCfromTempF(float tempF) {
+	return degCfromDegF(tempF - 32.0);
+}
+
+struct RVBattery : Service::Thermostat {
+	SpanCharacteristic *_ambientTemp;
+	SpanCharacteristic *_targetTemp;
+	SpanCharacteristic *_targetState;
+	SpanCharacteristic *_currentState;
+
+	int16_t _instance;
+
+	RVBattery(int16_t instance) : Service::Thermostat() {
+		_instance = instance;
+		_ambientTemp = new Characteristic::CurrentTemperature(tempCfromTempF(100));
+		_ambientTemp->setRange(tempCfromTempF(100), tempCfromTempF(160), degCfromDegF(1.0));
+		_targetTemp = new Characteristic::TargetTemperature(tempCfromTempF(100));
+		_targetTemp->setRange(tempCfromTempF(100), tempCfromTempF(160), degCfromDegF(1.0));
+
+		_currentState = new Characteristic::CurrentHeatingCoolingState(heatingCoolingStateOff);
+		_targetState = new Characteristic::TargetHeatingCoolingState(heatingCoolingStateOff);
+
+		new Characteristic::TemperatureDisplayUnits(homeKitTemperatureDisplayFahrenheit);
+		_targetState->setValidValues(2, heatingCoolingStateOff, heatingCoolingStateCool);
+
+	}
+
+	void loop() {
+		if (_targetState->getVal() != heatingCoolingStateOff) {
+			_targetState->setVal((int)heatingCoolingStateOff);
+		}
+	}
+
+	void setVoltage(uint8_t index, float voltage) {
+		float voltageAsTemp = tempCfromTempF(voltage * 10.0);
+		if (index == _instance && voltageAsTemp != _ambientTemp->getVal<float>()) {
+			printf("%u: Set voltage #%d: %0.1fV\n", (uint32_t)millis(), _instance, voltage);
+			_ambientTemp->setVal(voltageAsTemp);
+			lastPacketRecvTime = 0;
+		}
+	}
+};
+
+constexpr auto maxBatteries = 2;
+uint16_t batteryCount = 0;
+
+RVBattery* batteries[maxBatteries];
+
+void setBatteryVoltage(uint8_t index, float voltage) {
+	for (auto i=0; i<batteryCount; i++) {
+		batteries[i]->setVoltage(index, voltage);
+	}
+}
+
+//////////////////////////////////////////////
+
+constexpr uint32_t endStopExtraTimeMS = 500;
+
+struct RVAwning : Service::WindowCovering {
+	SpanCharacteristic* _currentPosition = NULL;
+	SpanCharacteristic* _targetPosition = NULL;
+
+	ShadeState _shadeState = 0;
+	float _currentShadePosition = homeKitShadeOpenValue;
+	uint64_t _nextPositionUpdateTime = 0;
+
+	uint64_t _operationEndTime;
+
+	uint8_t _retractIndex;
+	uint8_t _extendIndex;
+	uint32_t _openTimeMS;
+	uint32_t _closeTimeMS;
+
+	RVAwning(AwningDeviceRec* device) : Service::WindowCovering() {
+		_currentPosition = new Characteristic::CurrentPosition(homeKitShadeOpenValue);
+		_targetPosition = new Characteristic::TargetPosition(homeKitShadeOpenValue);
+		_retractIndex = device->retractIndex;
+		_extendIndex = device->extendIndex;
+		_openTimeMS = device->retractTime;
+		_closeTimeMS = device->extendTime;
+	}
+
+	boolean update() {
+		if (_targetPosition->updated()) {
+			uint64_t curTime = millis64();
+
+			float targetValue = _targetPosition->getNewVal<float>();
+			float moveAmount = targetValue - _currentShadePosition;
+			uint32_t moveTimeMS = abs(moveAmount / HomeKitPercentMax) * ((moveAmount > 0) ? _openTimeMS : _closeTimeMS);
+
+			_operationEndTime = curTime + moveTimeMS;
+
+			if (targetValue == homeKitShadeClosedValue || targetValue == homeKitShadeOpenValue) {
+				_operationEndTime += endStopExtraTimeMS;
+			}
+
+			_shadeState = shadeStateHomeKitAction | ((moveAmount > 0) ? shadeStateOpening : shadeStateClosing);
+
+			printf("%u: Changing position from %0.1f%% to %0.1f%% over %dmS.\n", (uint32_t)millis(), _currentShadePosition, targetValue, (int)(_operationEndTime-curTime));
+			printf("%u: State changed to 0x%02X\n", (uint32_t)millis(), _shadeState);
+		}
+		return true;
+	}
+
+	void loop() {
+		static uint64_t lastTime = 0;
+		uint64_t curTime = millis64();
+
+		if (lastTime == 0) {
+			lastTime = curTime;
+		}
+
+		if (curTime > lastTime) {
+			bool needPositionUpdate = false;
+			bool needTargetUpdate = false;
+
+			// if (_userOpenButton->pressed()) {
+			// 	_shadeState = shadeStateUserAction | shadeStateOpening;
+			// }
+			// else if (_userCloseButton->pressed()) {
+			// 	_shadeState = shadeStateUserAction | shadeStateClosing;
+			// }
+			// else if (_shadeState & shadeStateUserAction) {
+			// 	_shadeState = 0;
+			// 	needTargetUpdate = true;
+			// }
+
+			bool moving = (_shadeState & (shadeStateOpening | shadeStateClosing)) != 0;
+			bool movingOpen = (_shadeState & shadeStateOpening) != 0;
+
+			if (moving) {
+				_currentShadePosition += (curTime - lastTime) * ((movingOpen) ? (HomeKitPercentMax / _openTimeMS) : (HomeKitPercentMax / _closeTimeMS));
+				_currentShadePosition = max(homeKitShadeClosedValue, min(homeKitShadeOpenValue, _currentShadePosition));
+
+				if (_shadeState & shadeStateHomeKitAction && curTime > _operationEndTime) {
+					_currentShadePosition = _targetPosition->getVal<float>();
+					_shadeState = 0;
+					printf("%u: Homekit operation complete.\n", (uint32_t)millis());
+				}
+			}
+
+			// OutputState newOutputState;
+
+			// if (_shadeState & shadeStateHomeKitAction) {
+			// 	newOutputState = (_shadeState & shadeStateOpening) ? outputStateOpen : outputStateClose;
+			// }
+			// else {
+			// 	newOutputState = outputStateIdle;
+			// }
+
+			// if (newOutputState != _outputState) {
+			// 	SerPrintf("Output state changed to %d\n", newOutputState);
+
+			// 	_controlPin->clearDelayedState();
+			// 	_directionPin->clearDelayedState();
+
+			// 	bool newDirectionOutputState;
+			// 	bool newControlOutputState;
+
+			// 	if (newOutputState == outputStateOpen) {
+			// 		newDirectionOutputState = LOW;
+			// 		newControlOutputState = HIGH;
+			// 	}
+			// 	else if (newOutputState == outputStateClose) {
+			// 		newDirectionOutputState = HIGH;
+			// 		newControlOutputState = HIGH;
+			// 	}
+			// 	else {
+			// 		newDirectionOutputState = LOW;
+			// 		newControlOutputState = LOW;
+			// 	}
+
+			// 	if (newDirectionOutputState != _directionPin->state() && newControlOutputState != _controlPin->state()) {
+			// 		if (newControlOutputState == HIGH) {		// direction  needs time to settle before setting control
+			// 			_controlPin->setState(newControlOutputState, relaySettlingTimeMS);
+			// 			_directionPin->setState(newDirectionOutputState, 0);
+			// 		}
+			// 		else {									// direction needs to hold while control settles
+			// 			_controlPin->setState(newControlOutputState, 0);
+			// 			_directionPin->setState(newDirectionOutputState, relaySettlingTimeMS);
+			// 		}
+			// 	}
+			// 	else {
+			// 		_controlPin->setState(newControlOutputState, 0);
+			// 		_directionPin->setState(newDirectionOutputState, 0);
+			// 	}
+
+			// 	_outputState = newOutputState;
+			// 	needPositionUpdate = true;
+			// }
+
+			// if (needPositionUpdate || needTargetUpdate || (_nextPositionUpdateTime>0 && curTime > _nextPositionUpdateTime)) {
+			// 	if (needTargetUpdate || _shadeState & shadeStateUserAction) {
+			// 		float nextPosition = _currentShadePosition;
+					
+			// 		if (_shadeState & shadeStateOpening) {
+			// 			 nextPosition = min(homeKitShadeOpenValue, _currentShadePosition + openPerMS * updateTimeMS);
+			// 		}
+			// 		else if (_shadeState & shadeStateClosing) {
+			// 			 nextPosition = max(homeKitShadeClosedValue, _currentShadePosition - closePerMS * updateTimeMS);
+			// 		}
+
+			// 		if (_targetPosition->getVal<float>() != nextPosition) {
+			// 			_targetPosition->setVal(nextPosition);
+			// 			SerPrintf("Target changed to %0.1f%%\n", nextPosition);
+			// 		}
+			// 	}
+			// 	if (_currentPosition->getVal<float>() != _currentShadePosition) {
+			// 		_currentPosition->setVal(_currentShadePosition);
+			// 		SerPrintf("Position changed to %0.1f%% - output=%d\n", _currentShadePosition, _outputState);
+			// 	}
+			// 	_nextPositionUpdateTime = 0;
+			// }
+
+			// if (moving && _nextPositionUpdateTime == 0) {
+			// 	_nextPositionUpdateTime = curTime + updateTimeMS;
+			// }
+
+			// _controlPin->update(curTime);
+			// _directionPin->update(curTime);
+
+			// updateIndicator(_shadeState, _currentShadePosition);
+
+			lastTime = curTime;
+		}
+	}
+
+	void setLevel(uint8_t index, uint8_t dcDimmerLevel) {
+		bool on = dcDimmerLevel > 0;
+		uint16_t level = dcDimmerLevel * HomeKitPercentMax / RVCBrightMax;
+
+		if (index == _retractIndex) {
+			printf("%u: Awning #%d: retract = %d\n", (uint32_t)millis(), index, on);
+			lastPacketRecvTime = 0;
+		}
+		else if (index == _extendIndex) {
+			printf("%u: Awning #%d: extend = %d\n", (uint32_t)millis(), index, on);
+			lastPacketRecvTime = 0;
+		}
+	}
+};
+
+//////////////////////////////////////////////
+#ifndef HAVE_AWNINGS
+const AwningDeviceRec awningList[] = {
+};
+#endif
+
 constexpr uint16_t maxSwitches = sizeof(switchList) / sizeof(SwitchDeviceRec);
 constexpr uint16_t maxFans = sizeof(fanList) / sizeof(FanDeviceRec);
 constexpr uint16_t maxThermostats = sizeof(thermostatList) / sizeof(ThermostatDeviceRec);
+constexpr uint16_t maxAwnings = sizeof(awningList) / sizeof(AwningDeviceRec);
 
 uint16_t switchCount = 0;
 uint16_t fanCount = 0;
 uint16_t thermostatCount = 0;
+uint16_t awningCount = 0;
 
 RVSwitch* switches[maxSwitches];
 RVRoofFan* fans[maxFans];
 RVThermostat* thermostats[maxThermostats];
+RVAwning* awnings[maxAwnings];
 
 void setSwitchLevel(uint8_t index, uint8_t level) {
 	for (auto i=0; i<switchCount; i++) {
@@ -789,6 +1047,9 @@ void setSwitchLevel(uint8_t index, uint8_t level) {
 	}
 	for (auto i=0; i<thermostatCount; i++) {
 		thermostats[i]->setLevel(index, level);
+	}
+	for (auto i=0; i<awningCount; i++) {
+		awnings[i]->setLevel(index, level);
 	}
 }
 
@@ -805,11 +1066,6 @@ void setThermostatInfo(uint8_t index, ThermostatMode opMode, FanMode fanMode, ui
 }
 
 //////////////////////////////////////////////
-
-#ifndef HAVE_AWNINGS
-const AwningDeviceRec awningList[] = {
-};
-#endif
 
 void createDevices() {
 	SPAN_ACCESSORY();   // create Bridge
@@ -832,6 +1088,19 @@ void createDevices() {
 			SPAN_ACCESSORY(thermostat.name);
 				thermostats[thermostatCount++] = new RVThermostat(&thermostat);
 		}
+
+		for (AwningDeviceRec awning : awningList) {
+			printf("%u: Creating Awning \"%s\"\n", (uint32_t)millis(), awning.name);
+			SPAN_ACCESSORY(awning.name);
+				awnings[awningCount++] = new RVAwning(&awning);
+		}
+
+		#ifdef CREATE_BATTERIES
+		SPAN_ACCESSORY("House - V*10");
+			batteries[batteryCount++] = new RVBattery(1);
+		SPAN_ACCESSORY("Chassis - V*10");
+			batteries[batteryCount++] = new RVBattery(2);
+		#endif
 }
 
 //////////////////////////////////////////////
@@ -1155,15 +1424,12 @@ void processPacket(CAN_frame_t *packet) {
 			
 			setThermostatInfo(instance, opMode, fanMode, fanSpeed, heatTemp, coolTemp);
 		}
-		// else if (dgn == THERMOSTAT_COMMAND_1) {
-		// 	displayPacket(packet, packetPrintYes);
-		// }
-		// else if (dgn == FURNACE_COMMAND) {
-		// 	displayPacket(packet, packetPrintYes);
-		// }
-		// else if (dgn == FURNACE_STATUS) {
-		// 	displayPacket(packet, packetPrintYes);
-		// }
+		else if (dgn == BATTERY_STATUS) {
+			uint8_t instance = d[0];
+			uint16_t v_int = d[3]<<8 | d[2];
+			float voltage = v_int * 0.050;
+			setBatteryVoltage(instance, voltage);		
+		}
 	}
 }
 
@@ -1267,14 +1533,23 @@ void displayPacket(CAN_frame_t *packet, uint8_t printPacket) {
 		else if (dgn == DATE_TIME_STATUS) { }
 		else if (dgn == GENERIC_INDICATOR_COMMAND) { }
 		else if (dgn == GENERIC_CONFIGURATION_STATUS) { }
-		else if (dgn == DC_SOURCE_STATUS_1) { }
+		else if (dgn == DC_SOURCE_STATUS_1) {
+			uint8_t instance = d[0];
+			uint8_t priority = d[1];
+			uint16_t v_int = d[3]<<8 | d[2];
+			uint32_t i_int = d[7]<<24 | d[6]<<16 | d[5]<<8 | d[4];
+			float voltage = v_int * 0.050;
+			float current = -2000000.0 + i_int * 0.001;
+
+			printf("%u: DC_SOURCE_STATUS_1: inst=%d, pri=%d, voltage=%0.1f, current=%0.1f\n", (uint32_t)millis(), instance, priority, voltage, current);		
+		}
+		else if (dgn == BATTERY_STATUS) { }
 		else if (dgn == TANK_STATUS) { }
 		else if (dgn == GENERATOR_STATUS_1) { }
 		else if (dgn == 0x0FECA) { /* DM_1 - 1FECA - DM_RV */ }
 		else if (dgn == 0x0E8FF) { }
 		else if (dgn == 0x0EAFF) { }
 		else if (dgn == 0x15FCE) { }
-		else if (dgn == 0x1AAFD) { }
 		else if (dgn == 0x1BBFD) { }
 		else if (dgn == 0x1FACE) { }
 		else if (dgn == 0x1FACF) { }

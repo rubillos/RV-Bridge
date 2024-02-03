@@ -38,4 +38,7 @@ constexpr const char* sspwd = "***";
 
 constexpr uint8_t sourceAddress = 145;
 
+// uncomment to create battery devices for House and Chassis batteries
+#define CREATE_BATTERIES
+
 #include "RV/Miramar_2020_3202.h"

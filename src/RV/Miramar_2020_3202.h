@@ -39,7 +39,7 @@ const SwitchDeviceRec switchList[] = {
     18, Lamp, "Bathroom",
     24, Lamp, "Cargo",
     39, Lamp, "Steps",
-    57, Lamp, "Awning",
+    57, Lamp, "Awning Light",
     59, Lamp, "Vanity",
 
     23, Switch, "Water Pump"
@@ -60,5 +60,5 @@ const ThermostatDeviceRec thermostatList[] = {
 // extendIndex, retractIndex, extendTime, retractTime, name
 #define HAVE_AWNINGS
 const AwningDeviceRec awningList[] = {
-    5, 6, 10*1000, 10*1000, "Awning"
+    5, 6, 23*1000, 7*1000, 28*1000, 7*1000, "Awning"
 };

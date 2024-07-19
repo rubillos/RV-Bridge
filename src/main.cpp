@@ -190,7 +190,7 @@ constexpr uint8_t homeKitPositionStateRetracting = homeKitPositionStateOpening;
 constexpr uint8_t homeKitPositionStateStopped = 2;
 
 constexpr float awningRollPortion = 5.0;
-constexpr uint32_t awningOutputTimeMS = 300;
+constexpr uint32_t awningOutputTimeMS = 500;
 constexpr uint32_t awningUpdateHoldTimeMS = 500;
 
 constexpr uint8_t homeKitTemperatureDisplayCelsius = 0;
@@ -277,7 +277,7 @@ void processPacketQueue() {
 
 		if (lastPacketSendTime >= interval) {
 			if (doCANWrite) {
-				printf("%u: CAN-Bus Send Packet\n", (uint32_t)millis());
+				// printf("%u: CAN-Bus Send Packet\n", (uint32_t)millis());
 				ESP32Can.CANWriteFrame(&packetQueue[nextIndex]);
 			}
 			else {
@@ -847,6 +847,7 @@ struct RVAwning : Service::WindowCovering {
 	float _currentAwningTarget = homeKitAwningRetractedValue;
 
 	uint64_t _targetUpdateAtTime = 0;
+	uint64_t _noUpdateBeforeTime = 0;
 
 	uint8_t _retractIndex;
 	uint8_t _extendIndex;
@@ -870,10 +871,10 @@ struct RVAwning : Service::WindowCovering {
 
 		_retractIndex = device->retractIndex;
 		_extendIndex = device->extendIndex;
-		_openTimeMS = device->retractTime;
-		_rollOpenTimeMS = device->rollRetractTime;
-		_closeTimeMS = device->extendTime;
-		_rollCloseTimeMS = device->rollExtendTime;
+		_openTimeMS = device->retractTimeMS;
+		_rollOpenTimeMS = device->rollRetractTimeMS;
+		_closeTimeMS = device->extendTimeMS;
+		_rollCloseTimeMS = device->rollExtendTimeMS;
 	}
 
 	void sendExtend() {
@@ -891,10 +892,14 @@ struct RVAwning : Service::WindowCovering {
 	void targetUpdate() {
 		uint64_t curTime = millis64();
 
-		float targetValue = _targetPosition->getNewVal<float>();
+		float targetValue = _targetPosition->getVal<float>();
+
+		printf("%u: Awning - targetUpdate - target=%0.1f, currentTarget=%0.1f\n", (uint32_t)millis(), targetValue, _currentAwningTarget);
 
 		if (targetValue != _currentAwningTarget) {
 			float moveAmount = targetValue - _currentAwningPosition;
+
+			printf("%u: Awning - targetUpdate: moveAmount=%0.1f\n", (uint32_t)millis(), moveAmount);
 
 			if (moveAmount != 0) {
 				AwningState newDirection = (moveAmount > 0) ? awningStateRetracting : awningStateExtending;
@@ -912,11 +917,16 @@ struct RVAwning : Service::WindowCovering {
 					else {
 						sendRetract();
 					}
+					_currentPosition->setVal(_currentAwningPosition);
+					_awningState = 0;
 					_targetUpdateAtTime = curTime + awningOutputTimeMS + awningUpdateHoldTimeMS;
 				}
 				else { // not currently moving
 					_awningState = awningStateHomeKitAction | newDirection;
 					_currentAwningTarget = targetValue;
+
+					printf("%u: Awning - Change position from %0.1f%% to %0.1f%%\n", (uint32_t)millis(), _currentAwningPosition, targetValue);
+					printf("%u: Awning - State changed to 0x%02X\n", (uint32_t)millis(), _awningState);
 
 					if (_awningState & awningStateExtending) {
 						sendExtend();
@@ -924,9 +934,6 @@ struct RVAwning : Service::WindowCovering {
 					else {
 						sendRetract();
 					}
-
-					printf("%u: Awning - Change position from %0.1f%% to %0.1f%%\n", (uint32_t)millis(), _currentAwningPosition, targetValue);
-					printf("%u: Awning - State changed to 0x%02X\n", (uint32_t)millis(), _awningState);
 				}
 			}
 		}
@@ -956,31 +963,6 @@ struct RVAwning : Service::WindowCovering {
 		return true;
 	}
 
-	void awningButton(bool extend) {
-		uint64_t curTime = millis64();
-
-		if (curTime > _extendOffTime && curTime > _retractOffTime) {
-			if ((_awningState & (awningStateRetracting | awningStateExtending)) != 0) {
-				printf("%u: Awning - Button:%d, Motion Stopped\n", (uint32_t)millis(), extend);
-				_awningState = 0;
-				_targetPosition->setVal(_currentAwningPosition);
-				_currentAwningTarget = _currentAwningPosition;
-			}
-			else if (extend && _currentAwningPosition > homeKitAwningExtendedValue) {
-				printf("%u: Awning - Button: Extend Initiated\n", (uint32_t)millis());
-				_targetPosition->setVal(homeKitAwningExtendedValue);
-				_currentAwningTarget = homeKitAwningExtendedValue;
-				_awningState = awningStateUserAction | awningStateExtending;
-			}
-			else if (!extend && _currentAwningPosition < homeKitAwningRetractedValue) {
-				printf("%u: Awning - Button: Retract Initiated\n", (uint32_t)millis());
-				_targetPosition->setVal(homeKitAwningRetractedValue);
-				_currentAwningTarget = homeKitAwningRetractedValue;
-				_awningState = awningStateUserAction | awningStateRetracting;
-			}
-		}
-	}
-
 	void loop() {
 		static uint64_t lastTime = 0;
 		uint64_t curTime = millis64();
@@ -989,7 +971,7 @@ struct RVAwning : Service::WindowCovering {
 			lastTime = curTime;
 		}
 
-		if (_targetUpdateAtTime != 0 && curTime > _targetUpdateAtTime) {
+		if (_targetUpdateAtTime != 0 && curTime > _targetUpdateAtTime && curTime > _noUpdateBeforeTime) {
 			_targetUpdateAtTime = 0;
 			targetUpdate();
 		}
@@ -1036,14 +1018,41 @@ struct RVAwning : Service::WindowCovering {
 				printf("%u: Awning - Disable extend output\n", (uint32_t)millis());
 				sendOnOff(_extendIndex, false);
 				_extendOffTime = 0;
+				_noUpdateBeforeTime = curTime + awningUpdateHoldTimeMS;
 			}
 			if (_retractOffTime!=0 && curTime>=_retractOffTime) {
 				printf("%u: Awning - Disable retract output\n", (uint32_t)millis());
 				sendOnOff(_retractIndex, false);
 				_retractOffTime = 0;
+				_noUpdateBeforeTime = curTime + awningUpdateHoldTimeMS;
 			}
 
 			lastTime = curTime;
+		}
+	}
+
+	void awningButton(bool extend) {
+		uint64_t curTime = millis64();
+
+		if (curTime > _extendOffTime && curTime > _retractOffTime) {
+			if ((_awningState & (awningStateRetracting | awningStateExtending)) != 0) {
+				printf("%u: Awning - Button:%d, Motion Stopped\n", (uint32_t)millis(), extend);
+				_awningState = 0;
+				_targetPosition->setVal(_currentAwningPosition);
+				_currentAwningTarget = _currentAwningPosition;
+			}
+			else if (extend && _currentAwningPosition > homeKitAwningExtendedValue) {
+				printf("%u: Awning - Button: Extend Initiated\n", (uint32_t)millis());
+				_targetPosition->setVal(homeKitAwningExtendedValue);
+				_currentAwningTarget = homeKitAwningExtendedValue;
+				_awningState = awningStateUserAction | awningStateExtending;
+			}
+			else if (!extend && _currentAwningPosition < homeKitAwningRetractedValue) {
+				printf("%u: Awning - Button: Retract Initiated\n", (uint32_t)millis());
+				_targetPosition->setVal(homeKitAwningRetractedValue);
+				_currentAwningTarget = homeKitAwningRetractedValue;
+				_awningState = awningStateUserAction | awningStateRetracting;
+			}
 		}
 	}
 

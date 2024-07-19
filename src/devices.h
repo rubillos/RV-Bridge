@@ -65,10 +65,10 @@ typedef struct {
 typedef struct {
     int16_t extendIndex;
     int16_t retractIndex;
-    uint32_t extendTime;
-    uint32_t rollExtendTime;
-    uint32_t retractTime;
-    uint32_t rollRetractTime;
+    uint32_t extendTimeMS;
+    uint32_t rollExtendTimeMS;
+    uint32_t retractTimeMS;
+    uint32_t rollRetractTimeMS;
     const char* name;
 } AwningDeviceRec;
 

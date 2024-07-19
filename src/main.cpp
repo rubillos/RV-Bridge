@@ -872,9 +872,9 @@ struct RVAwning : Service::WindowCovering {
 		_retractIndex = device->retractIndex;
 		_extendIndex = device->extendIndex;
 		_openTimeMS = device->retractTimeMS;
-		_rollOpenTimeMS = device->rollRetractTimeMS;
+		_rollOpenTimeMS = max(1U, device->rollRetractTimeMS);
 		_closeTimeMS = device->extendTimeMS;
-		_rollCloseTimeMS = device->rollExtendTimeMS;
+		_rollCloseTimeMS = max(1U, device->rollExtendTimeMS);
 	}
 
 	void sendExtend() {

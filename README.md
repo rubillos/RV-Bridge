@@ -53,8 +53,13 @@ I also recently started playing with [HomeSpan](https://github.com/HomeSpan/Home
 RV-Bridge is the result of putting these pieces together.
 
 ---
-## <a name="state"></a>Current Project State (v1.0.0)
+## <a name="state"></a>Current Project State
 
+## v1.0.9 - In progress
+* Added option to create two "Thermostats" which show the voltage of the chassis and house batteries as temperature * 10
+* Added support for exterior awnings.
+
+## v1.0.0
 * Homespan pairing works, devices show up in the Home app.
 * CAN-Bus packet receiving works.
 * RV-C messages are routed correctly to the HomeKit tiles.
@@ -124,7 +129,20 @@ The CAN-Bus connector plugs into one of the available sockets inside the system 
             * Output number for high fan.
             * Output number for furnace - optional, -1 if not present.
             * Name.
+        * Each awning has:
+            * Output number for extend.
+            * Output number for retract.
+            * Time (in ms) that the awning takes to get to the "unroll" portion.
+            * Time (in ms) that the awning takes to "unroll" at the end. Set to 0 if not applicable.
+            * Time (in ms) that the awning takes to get from the "roll" portion to fully retracted.
+            * Time (in ms) that the awning takes to "roll" at the beginning. Set to 0 if not applicable.
+            * Name.
         * See [Finding Output Numbers](#outputs) below for details on output numbers.
+    * Uncomment `#define CREATE_BATTERIES` to create "Thermostats" for the house and chassis batteries.
+        * The "thermostat" will show the current battery voltage times 10 as temperature.
+            * Homekit does not currently have a way to display voltages, so this is my hack to be able to see this very useful information.
+        * You will likely want to turn off "Include in Home Summaries" in the Status setting for these "thermostats".
+        * When in screen "rearrange" mode you can tap on a thermostat and choose to show it in a smaller sized tile.
 - Flashing
     * If you are using an ESP32 with a USB-C connector and flashing from a Mac, you may need to connect it via a USB hub due to some timing weirdness around resetting the ESP32 into boot mode. I use a USB-C to 4 port USB-A hub with a USB-A to USB-C cable.
 - Startup
@@ -207,4 +225,4 @@ Currently the project includes definition files for these RVs in the `RV` folder
 
 ---
 
-Copyright © 2023 [Randy Ubillos](http://rickandrandy.com)
+Copyright © 2023-2024 [Randy Ubillos](http://rickandrandy.com)
